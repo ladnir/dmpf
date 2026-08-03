@@ -38,7 +38,7 @@ We solve the challenges of the cuckoo construction by completely eliminating the
     The $\mod d$ can then be manually offset. That is, some index $\alpha \in \{0,1\}^{\log N}$ is hashed to positions
     $$
         h_j'(\alpha) := (\langle \alpha, h_j \rangle \mod d) + 1 + (j-1)d
-    $
+    $$
 
     \item Once the $\share{h_j}$ values are solved for, the parties can reveal them and use $h_j'$ to define the position matrix $P$. The rest of the protocol can the proceed as described before with the use of the Sparse DPF protocol for each column of $P$.
 \end{itemize}
@@ -104,53 +104,95 @@ Next we will present the neccessary subprotocols before a formal description and
 \end{figure}
 
 
-\paragraph{Proof Sketch (semi-honest).}
-We show that the view of either party in the real protocol is simulatable given only public parameters except with negligible probability.
-
-\emph{Simulator.} On input public params \((N,m,w,\ldots)\):
-\begin{enumerate}
-  \item Sample \(h_1,\ldots,h_w \leftarrow \{0,1\}^{q}\) independently and uniformly, and form the public hash family \(h'_\ell(x) := (\langle H_\ell(x), h_\ell\rangle ) + 1 + (\ell{-}1)d\) and the induced position map \(P\).
-  \item With probability equal to the cuckoo failure probability (negligible in \(\lambda\) for the chosen load), output \(\mathsf{abort}\) and halt. Otherwise continue.
-  \item Simulate the MPC transcripts of \textsf{dedup}, \textsf{bin-solver}, and the local computations by sampling random messages consistent with (i) the public sizes and (ii) the final revealed \(h_\ell\). For sparse-DPF subinstances, output random keys that are distributed as real DPF keys (by the PRG/DPF security) and do not require knowledge of the hidden indices/values.
-\end{enumerate}
-
-\noindent \emph{Indistinguishability argument.}\\
-
-(1) \textbf{Distribution of the revealed hash descriptors \(\boldsymbol{h_i}\).}
-In the real protocol (Fig.~\ref{fig:revCuckoo}, Steps 7-9), each block \(i\in[w]\) forms
+\paragraph{The reverse-cuckoo leakage channel.}
+The revealed hash descriptors are not input-independent uniform strings, and
+the difference is not only a cuckoo-failure bit.  The following idealized
+calculation makes the leakage precise.  Fix a set $A$ of $t$ distinct active
+items, let $U$ be the distribution obtained by giving every item one
+independent uniform candidate in each of $w$ disjoint partitions of size $d$,
+and let $Z_A(h)$ be the number of injective placements of $A$ in the resulting
+cuckoo graph $h$.  A fixed injection into the $m=wd$ bins is compatible with
+$h\gets U$ with probability $d^{-t}$, and hence
 \[
-  M_i \;=\;
-  \begin{bmatrix}
-    H_i(A_{g+1})\\[-2pt]\vdots\\[-2pt] H_i(A_{g+d})
-  \end{bmatrix}
-  \in \{0,1\}^{d\times q},
-  \qquad
-  y_i \;=\; (0,1,\ldots,d{-}1)^\top,
-  \quad g=(i{-}1)d,
+    \mathbb E_{h\gets U}[Z_A(h)] = \frac{(m)_t}{d^t}.
 \]
-and runs \(\textsf{bin-solver}(M_i,y_i)\) to obtain a secret-shared solution \(\share{h_i}\in\{0,1\}^q\), which is then revealed as \(h_i\).
-By construction, conditioned on \(\mathrm{rank}(M_i)=d\) (which holds except with probability \(\le 2^{-(q-d)}\) by our choice \(q=d+\lambda\); see \S\ref{sec:hash}), the solution set
-\(\{h\in\{0,1\}^q : M_i h = y_i\}\) is an affine subspace of dimension \(q{-}d\), and our randomized solver outputs \(h_i\) \emph{uniformly} over that subspace.
-\TODO{Rewrite the rank argument using the active submatrix consisting only of non-dummy rows. Since $H_i(N)=0$, dummy rows are intentionally ignored by \textsf{bin-solver}; the required event is full row rank of the $r_i$ active rows, giving solution-space dimension $q-r_i$. A real row mapping to zero or depending on another active row is part of the rank-failure event. Also rewrite ``abort'' below as a bad event where the proof/correctness guarantee fails, not a protocol action.}
-Since neither the rows \(H_i(A_{g+u})\) (i.e., \(M_i\)) nor anything about the \(A\)’s is revealed, the adversary only sees the published \(h_i\) with the public sizes \((d,q)\).
-Thus, from either party’s view, each \(h_i\) is distributed as a random element of a hidden affine coset determined by the (unrevealed) \(M_i\) and public \(y_i\).
-In the simulator, we therefore sample \(h_i \leftarrow \{0,1\}^q\) uniformly and proceed, since the induced public uses of \(h_i\) are only through Steps 10-12:
-\[
-  s_{j,i'} \;=\; \langle H_j(i'),\, h_j\rangle,
-  \qquad
-  P_{i',(j-1)d + s_{j,i'}}=1,
-\]
-which depend on \(h_i\) but not on the hidden \(M_i\); any distinguishing advantage would imply learning linear relations about the secret \(A\)’s from \(h_i\) alone, contradicting that \(M_i\) (hence the defining coset) is never revealed.
+Reverse cuckoo instead chooses a uniform injection first and programs the
+corresponding candidate of each item.  Summing over the injections compatible
+with a fixed $h$ gives the exact likelihood identity
+\begin{equation}\label{eq:rev-cuckoo-size-bias}
+ \Pr[H=h\mid A]_{\mathsf{RC}}
+   = \Pr[H=h]_{U}\,
+     \frac{Z_A(h)}{\mathbb E_{U}[Z_A(H)]}.
+\end{equation}
+Thus the real distribution is size-biased by the \emph{number} of valid
+placements; it is not $U$ conditioned merely on $Z_A(h)>0$.  Its information
+density relative to the input-independent base $U$ is
+$\log_2 Z_A(h)-\log_2\mathbb E_U Z_A(H)$.  This observation invalidates the
+stronger claim that generic Reverse Cuckoo leaks only a negligible abort bit.
 
-(2) \textbf{Cuckoo validity / abort.} For the revealed hash family \(h'_\ell\), the existence of a valid placement of the \(t\) items into \(m=(1{+}\varepsilon)t\) bins using \(w\) choices per item fails with negligible probability under standard cuckoo analysis. The real protocol only proceeds when a valid assignment exists (our construction fixes a permutation and solves for consistent \(h'\)); the simulator mirrors this by aborting with exactly the same negligible probability, so the abort bit is perfectly coupled.
+Equation~\eqref{eq:rev-cuckoo-size-bias} describes the standard random-function
+model.  In the protocol, $h$ is represented by the revealed solutions to the
+Goldreich-feature linear systems.  Let
+$\mathsf{Leak}_{\mathsf{RC},N,t,w,d,B}(\mathcal A)$ denote the joint distribution of all public
+hash descriptors in a batch of $B$ Reverse-Cuckoo instances on support lists
+$\mathcal A$, including the shared fresh feature matrices used by the
+implementation.  The definition includes the feature-rank bad event.  On the
+event that every active feature submatrix has full row rank, randomized
+\textsf{bin-solver} samples uniformly from the required affine solution
+spaces; a zero or dependent active row is a proof-failure event, not a
+protocol abort.  Dummy rows are omitted from this rank requirement because
+$H_i(N)=0$ and \textsf{bin-solver} intentionally ignores them.
 
-(3) \textbf{Transcript simulation.} The \textsf{dedup} and \textsf{bin-solver} subprotocols are linear/boolean MPC over secret shares; they reveal no additional outputs beyond \(s_\ell\). Standard straight-line simulators for OT/garbled MPC can therefore produce transcripts indistinguishable from real, given \(s_\ell\) and sizes. For each sparse-DPF, key indistinguishability of the underlying DPF (against a party who sees only its own key) lets us sample keys without the hidden \((A'_j,B'_j)\). Since the public position map \(P\) is a function of the revealed \(s_\ell\) only, no additional information about the inputs is leaked.
+\paragraph{Leakage-robust Ring-LPN assumption.}
+We use Reverse Cuckoo in the PCG only under the following explicit auxiliary
+leakage assumption.  Sample $e,f\gets\mathsf{HW}_{\mathbb R,t}$,
+$r,u\gets\mathbb R$, let $\mathcal A(e,f)$ contain every (possibly regularized
+or product) support list supplied to Reverse Cuckoo by the PCG, and sample
+$\Lambda\gets\mathsf{Leak}_{\mathsf{RC},N,t,w,d,B}(\mathcal A(e,f))$ jointly with those supports.
+We assume
+\begin{equation}\label{eq:ring-lpn-revcuckoo-leakage}
+  (r,\;r e+f,\;\Lambda)
+       \;\approx_c\;
+  (r,\;u,\;\Lambda).
+\end{equation}
+The batched version quantifies jointly over all sparse polynomials and all
+descriptors used in one PCG setup, rather than assuming that leakage from
+different sets is independent.  For Stationary LPN, the same $\Lambda$ and
+support are retained across the prescribed number of expansions while the
+coefficients and ring masks refresh.  This is a falsifiable strengthening of
+Ring-LPN/SSD with a fully specified, efficiently sampleable support-leakage
+channel; we do not claim a reduction from plain Ring-LPN.
 
-(4) \textbf{Correctness (brief).} When \(M_\ell\) are full rank, each block produces hash parameters \(s_\ell\) that send every \(A'_i\) to its designated bin; the sparse-DPFs routed by \(P\) then sum to \(y=\sum_i \unitVec_{[0,N)}(A_i,B_i)\). Padding and \textsf{dedup} ensure uniqueness and proper summation under collisions.
+\paragraph{Security statement under leakage.}
+For arbitrary inputs, Reverse Cuckoo realizes a leakage-augmented DMPF
+functionality that outputs $\Lambda$ in addition to the DMPF output.  Given
+$\Lambda$, standard semi-honest simulators for \textsf{dedup},
+\textsf{bin-solver}, the permutation, and the sparse DPFs simulate the
+remaining transcript, up to their usual cryptographic errors and the active
+feature-rank bad event.  In the Ring-LPN and Stationary-LPN applications,
+Equation~\eqref{eq:ring-lpn-revcuckoo-leakage} then hides the sparse noise even
+given $\Lambda$.  Correctness is unconditional outside the rank bad event:
+the programmed candidate sends every active item to its distinct designated
+bin, after which the sparse DPFs sum to the requested multi-point function.
 
-The simulated view is indistinguishable from the real view; any difference occurs only in the negligible cuckoo-failure event, which is identically reflected by the simulator's abort. In particular, this is the standard semi-honest simulation model with abort: the ideal functionality is allowed to output $\bot$ with negligible probability, and the simulator must match the abort distribution. The only leakage beyond the DMPF output is this abort bit, which is identical to the leakage present in cuckoo-hashing-based protocols (e.g., PSI) where failure corresponds to the nonexistence of a valid placement under the public hash functions.
-
-
+\paragraph{Concrete cuckoo failure.}
+Failure of an input-independent table to admit a placement remains useful for
+quantifying how far one would need to move toward ordinary cuckoo security,
+but it is distinct from the size-bias leakage above.  Exact matching
+experiments at the implementation's current two-choice parameters $d=t$ give
+failure probabilities $0.0620,0.1005,0.1158$ for
+$t=16,64,128$, respectively; this load is at the two-choice threshold and the
+failure does not decay.  Enumerating all Hall witnesses gives conservative
+40-bit parameter bounds.  For a batch of $B=256$ sets (hence a per-set target
+$2^{-48}$), three choices with power-of-two partition sizes
+$d=128,256,256$ for $t=16,64,128$ give log-base-two batch failure bounds
+$-44.16,-44.71,-40.63$, respectively.  The corresponding two-choice sizes are
+$32768,65536,131072$ and are not practical.  These are placement-failure
+bounds only; Equation~\eqref{eq:ring-lpn-revcuckoo-leakage} is still required
+for the support leakage.  The current implementation derives $d$ directly
+from $(t,w)$ and does not use its \texttt{cuckooSecParam} argument; selecting
+these bounds therefore also requires exposing $d$ (or a validated failure
+target) in the initialization API.
 
 \iffull
 
