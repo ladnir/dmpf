@@ -131,6 +131,7 @@ In the real protocol (Fig.~\ref{fig:revCuckoo}, Steps 7-9), each block \(i\in[w]
 and runs \(\textsf{bin-solver}(M_i,y_i)\) to obtain a secret-shared solution \(\share{h_i}\in\{0,1\}^q\), which is then revealed as \(h_i\).
 By construction, conditioned on \(\mathrm{rank}(M_i)=d\) (which holds except with probability \(\le 2^{-(q-d)}\) by our choice \(q=d+\lambda\); see \S\ref{sec:hash}), the solution set
 \(\{h\in\{0,1\}^q : M_i h = y_i\}\) is an affine subspace of dimension \(q{-}d\), and our randomized solver outputs \(h_i\) \emph{uniformly} over that subspace.
+\TODO{Rewrite the rank argument using the active submatrix consisting only of non-dummy rows. Since $H_i(N)=0$, dummy rows are intentionally ignored by \textsf{bin-solver}; the required event is full row rank of the $r_i$ active rows, giving solution-space dimension $q-r_i$. A real row mapping to zero or depending on another active row is part of the rank-failure event. Also rewrite ``abort'' below as a bad event where the proof/correctness guarantee fails, not a protocol action.}
 Since neither the rows \(H_i(A_{g+u})\) (i.e., \(M_i\)) nor anything about the \(A\)’s is revealed, the adversary only sees the published \(h_i\) with the public sizes \((d,q)\).
 Thus, from either party’s view, each \(h_i\) is distributed as a random element of a hidden affine coset determined by the (unrevealed) \(M_i\) and public \(y_i\).
 In the simulator, we therefore sample \(h_i \leftarrow \{0,1\}^q\) uniformly and proceed, since the induced public uses of \(h_i\) are only through Steps 10-12:

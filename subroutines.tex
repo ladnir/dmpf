@@ -214,6 +214,7 @@ blocks and enforce $H_i(N)=0$ so padding rows are neutral.
 \paragraph{A Goldreich-style hash (seeded, non-cryptographic).}
 We now describe a simple, efficient, Goldreich-PRG -- inspired family that we conjecture meets
 the above rank requirement while remaining MPC-friendly.
+\TODO{Formalize the conjecture as a feature-rank assumption. For fixed distinct active inputs, define the translated nonlinear feature rows $v_i=\phi(x_i)\oplus\phi(N)$ and assume they have full row rank except with probability $\epsilon_{\mathrm{feat}}$ over fresh independent $M_0,M_1$. Conditioned on that event, prove that independent uniform $M_2$ makes the active hash rows uniform and gives total rank-failure probability at most $\epsilon_{\mathrm{feat}}+2^{-(q-r)}$. State clearly that the experiments support the assumption for tested parameters/input families but do not prove the worst-case claim.}
 
 \subparagraph{Interface.}
 A hash instance is parameterized by a seed and three binary matrices:
