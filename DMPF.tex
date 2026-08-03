@@ -1,0 +1,65 @@
+
+
+\section{Distributed Multi-Point Function}\label{sec:dmpf}
+
+
+%### 3 Distributed Multi-Point Functions (DMPFs) — Overview and Roadmap
+
+\sectionref{sec:dpf} established how a DPF lets two parties share a vector that is zero everywhere except at a \emph{single} secret location.  In many real-world privacy-preserving tasks, however -- think batched private look-ups, sparse PIR queries, or advanced PCG constructions -- \emph{several} positions must be populated at once.  A naïve implementation would simply run $t$ independent DPFs and add their outputs, but this inflates keys, computation, and communication by a factor of $t$.
+
+In this section we show how to avoid that blow-up by moving to \emph{Distributed Multi-Point Functions} (DMPFs), which secret-share a vector of length $N$ containing up to $t$ non-zero entries while retaining the compactness and efficiency that make DPFs attractive.  \figureref{fig:dmpfFunc} formalises the ideal functionality we target: given secret-shared index-value pairs
+$(\share{A_1},\dots,\share{A_t})\in [0,N)^t$ and
+$(\share{B_1},\dots,$ $\share{B_t})\in \GG^t$, the parties obtain an additive sharing of the vector
+$\sum_{i=1}^{t}\unitVec(A_i,B_i)$.
+
+Achieving this compactly raises three core challenges:
+
+\begin{enumerate}
+    \item \emph{Computational overhead.} The work should scale with $N$ and be ideally be independent of $t$.
+    \item \emph{Succint key generation.} The communication overhead must be sublinear in $N$, ideally just $O(t\log N)$.
+    \item  \emph{Index collisions \& deduplication.}  Duplicate indices must be merged without leaking which entries collided. 
+\end{enumerate}
+
+A trivial and common way \cite{boyle2020efficient,foleage,anyField,pcgZ2k} to implement a DMPF is with $t$ instances of a DPF, one for each $(A_i,B_i)$ pair. The final result is obtained by adding the DPFs together. However, this approach results in $O(Nt)$ work and therefore is far from the theoretical optimal of just $O(N)$. Indeed, implementations have shown that this is the main bottleneck for important applications \cite{foleage,libOTe}.
+We address these challenges with the following constructions:
+
+\begin{itemize}
+  \item \emph{\sectionref{sec:cuckoo} Cuckoo-based baseline.}
+  We review the classical cuckoo-hash approach \cite{cuckooDmpf,dmpf}, which can be viewed as a concrete instantiation of earlier batch-code-based FSS ideas \cite{fssBatchCodes}: each point is routed to one of several buckets using pairwise-independent hash functions. We then further optimize it using our new sparse-DPF is instantiated per bucket.  While conceptually simple, the scheme suffers from heavy key-generation cost, making it ill-suited for tight concrete efficiency.
+
+   \item \emph{\sectionref{sec:revCuckoo} Reverse-Cuckoo DMPF.}
+  We flip the viewpoint: instead of first choosing hash function and then assigning the points into bins, we first randomly assign the input points into bins and then solve for a set of compatible hash functions within MPC. Interestingly, the proof of security of this construction consists of the simulator performing cuckoo hashing.
+
+   \item \emph{\sectionref{sec:bucketing} Bucketing DMPF.} The Bucketing DMPF construction optimizes key generation and evaluation by partitioning the $t$ input index-value pairs into multiple buckets, each handled independently—typically via a sparse DPF—enabling parallelism and reducing key size compared to running $t$ separate DPFs. By selecting bucket parameters and assignment algorithms carefully, this approach balances efficiency with security, ensuring duplicate indices are resolved correctly without leaking information.
+  
+
+ \item \emph{\sectionref{sec:bigState} Big-State DMPF.}
+  We give two new key generation protocols for the  Boyle-Gilboa-Hamilis-Ishai-Tu \emph{big-state} paradigm\cite{dmpf}.  The first is blackbox and is inspired by our Reverse-Cuckoo construction. The other is a suprisingly simple idea to use generic MPC and the recent AltMod-based PRG to efficiently distribute the ``non-distributed'' key generation algorithm.
+\end{itemize}
+
+Throughout the section we give precise complexity tables, security proofs in the standard simulation model, and concrete parameter choices targeting 128-bit security.  The end result is a toolkit that lets protocol designers pick the DMPF flavour -- cuckoo, reverse-cuckoo, bucketing or big-state -- that  best matches their workload's size and latency constraints.
+
+With the roadmap in place, we now dive into the simplest construction.
+
+
+\begin{figure}\vspace{-0.3cm}\small
+	\centering
+	\fbox{ \begin{minipage}{.95\textwidth}
+    For public parameters $N \in \mathbb{N}, t \in [1, n]$ and group $\mathbb{G}$.\\
+    
+    On input $\share{A}\in [0, N)^t,\share{B}\in \mathbb{G}^t$, computes:
+    \begin{enumerate}
+        \item Let $y=\sum_{i\in [t]}\unitVec(A_i, B_i)$
+        \item Sample $\share{y}$.
+        \item Output $\share{y}$.
+    \end{enumerate}
+    \end{minipage}}
+\caption{%
+  Distirbuted Multi-Point Function (DMPF) Functionality.\label{fig:dmpfFunc}
+}\vspace{-1cm}
+\end{figure}
+
+
+
+
+

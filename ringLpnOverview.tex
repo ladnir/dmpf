@@ -1,0 +1,131 @@
+
+
+
+\subsection{Ring-LPN overview and its use in PCGs} \label{subsec:ringlpn}
+The Ring-LPN assumption works over a quotient ring $\mathbb R:=\mathbb F_q[X]/F(X)$ (degree $N$), with “sparse” noise polynomials of Hamming weight $t$. Writing $e,f\gets \mathsf{HW}_{\mathbb R,t}$ for $t$-sparse polynomials and $r\gets \mathbb R$, the distribution
+\[
+(r,\; r\cdot e+f)\qquad\text{is computationally indistinguishable from}\qquad (r,\; u),\ u\gets \mathbb R,
+\]
+as formalized in \cite[Def.~3.1]{boyle2020efficient}. Concretely, $\mathbb R$ will be the polynomials modulo $F(X)=(X^N+1)$. This choice allows efficient polynomial multiplications via a negacyclic NTT.
+
+Boyle et al.\ showed how to realize a \emph{silent} PCG for OLE (and authenticated triples) from Ring-LPN by packing many field OLEs into one ring instance and expanding with fast polynomial arithmetic; see their overview and the OLE/triples sections \cite{boyle2020efficient}. In brief:
+\begin{itemize}
+  \item Party $p\in \{0,1\}$ samples two (or more) random $t$-sparse polynomials $(e_{p,0}, e_{p,1})\in \mathbb R^2$. Concretely, this will represent sampling $t$-sparse vectors. 
+  \item The parties will sample a random polynomial $r\in \mathbb R$.
+  \item Party $p$ will compute $x_p' := e_{p,0} + r \cdot e_{p,1}$.
+  \item Party $p$ applies an NTT to obtain $x_p:=\mathsf{NTT}(x_p')\in \mathbb{F}_q^N$. A vector of $N$ $\mathbb F _q$ elements.
+  \item The parties \emph{want} to compute a secret sharing 
+  \begin{align*}
+    \share{y'}&=x_0' \cdot x_1'\in \mathbb R\\
+             &= ( e_{0,0} + r \cdot e_{0,1}) \cdot ( e_{1,0} + r \cdot e_{1,1})\\
+             &= 
+             e_{0,0} \cdot e_{1,0}  + 
+             r \cdot e_{0,1} \cdot  e_{1,0} + 
+             e_{0,0}\cdot r \cdot e_{1,1} +
+             r^2 \cdot  e_{0,1} \cdot e_{1,1}
+  \end{align*}
+  \item Given $\share{y'}$, the parties can then locally compute $\share{y}:=\mathsf{NTT}(\share{y'})$. The critical property is that
+  $$
+        x_{0} \odot x_{1} = \share{y}_0 + \share{y_1}
+  $$
+  where $\odot$ is componentwise multiplication over vectors $\mathbb{F}_q^N$. This is percisely an Oblivious Linear Evaluation (OLE) correlation. One interpretation of this transform is that the NTT is performing polynomails evaluation. If  $\share{y'}=x_0' \cdot x_1'\in \mathbb R$, then for some $\alpha\in \mathbb F_q$ the same holds for $\share{y'(\alpha)}=x_0'(\alpha) \cdot x_1'(\alpha)\in \mathbb F_q$ (for an appropriately chosen $\mathbb R$).    Two such correlations can then be locally converted into $N$ Beaver triples
+  $$
+    \share{a},\share{b}, \share{c} \in \mathbb{F}_q^N \text{  s.t. } \share{a} \odot \share{b} = \share{c}
+  $$
+  
+  \item Let $A_{p,i}\subset [0,N)^t, B_{p,i}\in \mathbb F_q^t$ denote the positions and values of the non-zeros coefficients in $e_{p,i}\in \mathbb R$. Observe that the product polynomial $e_{0,i}\cdot e_{1,j}$ has position and values described as
+  \begin{align*}
+        A'_{i,j}:=&A_{0,i} \boxplus A_{1,j} \in [0,2N)^{t^2},\\
+        B'_{i,j}:=&B_{0,i} \otimes B_{1,j} \in \mathbb{F}_q^{t^2}
+  \end{align*}
+  where $\boxplus$ is the cartisian addition and $\otimes$ is the cartisian product of the sets. That is, 
+    $$
+        e_{0,i}\cdot e_{1,j} = \mathsf{makePoly}(A'_{i,j}, B'_{i,j}) \mod F(X)
+    $$
+    where $\mathsf{makePoly}(P\in \mathbb N^t, V\in \mathbb F^t)= \sum_i V_i X^{P_i}$ returns the polynomails with the $V$ coefficients at the $P$ positons.
+
+  \item Observe that ${\mathsf{makePoly}(\share{A'_{i,j}}, \share{B'_{i,j}})}$ can directly be constructed from a DMPF. In particular, ${\mathsf{makePoly}(\share{A'_{i,j}}, \share{B'_{i,j}})}$ is perciesely the same function as a DMPF when the polynomial is express as a vector of coefficients. 
+\end{itemize}
+
+\noindent
+The outline above gives a concrete protocol for generating $N$ OLE and Beaver triples. 
+\begin{enumerate} 
+\item The parties sample their sparse polynomails. 
+\item Each party construct the sparse represetation of their polynomails. Using generic MPC or similar, they compute the cartisian addition and product of the positons and values to obtains $\share{A'_{i,j}}, \share{B'_{i,j}}$. 
+\item They use a DPMF of size $t^2$ for each $(i,j)$  to obtain $\mathsf{makePoly}(A'_{i,j}, B'_{i,j})$ in secret shared form. 
+\item They reduce this modulo $F(X)$.
+\item They perform local additions and FFT operations to obtain $N$ OLE or $N/2$ Beaver Triples over $\mathbb F_q$. 
+\end{enumerate}
+
+
+One can further optimize this protocol by restricting the polynomials to being regular\cite{boyle2020efficient}. Given this restriction, $\mathsf{makePoly}$ can be implemented as $t$ instances of a DMPF, each of size $t$. This can allow for a more efficient implement than a single DMPF instance of size $t^2.$
+
+
+
+
+
+\subsection{Stationary LPN / SSD and amortizing noise generation}\label{sec:stationary}
+
+\emph{Stationary LPN} (a.k.a.\ Stationary Syndrome Decoding, SSD) captures the setting where the \emph{support} of the noise is reused across many instances while the \emph{payloads} (coefficients) are freshly sampled each time \cite{Stationary}.
+In our Ring-LPN notation from above, fix for each party $p\in\{0,1\}$ and selector $i\in\{0,1\}$ a support set
+\[
+L_{p,i}\subseteq[0,N),\qquad |L_{p,i}|=t,
+\]
+and let $A_{p,i}$ be the sorted list of positions in $L_{p,i}$.
+For the $s$-th expansion, sample fresh coefficient vectors $B^{(s)}_{p,i}\in\mathbb F_q^{t}$ and form
+\[
+e^{(s)}_{p,i}\ :=\ \mathsf{makePoly}\!\big(A_{p,i},\,B^{(s)}_{p,i}\big)\ \in\ \mathbb R,
+\]
+while sampling an independent $r^{(s)}\leftarrow\mathbb R$.
+Security asserts that reusing $(L_{p,i})$ across many $s=1,2,\ldots,q$ (with fresh coefficients and ring masks) remains pseudorandom against the relevant classes of attacks, so that the pairs
+\(
+\big(r^{(s)},\,r^{(s)}\cdot e^{(s)}_{p,1}+e^{(s)}_{p,0}\big)
+\)
+are computationally indistinguishable from random in~$\mathbb R^2$ for each~$s$.
+
+\paragraph{Consequence for the product terms.}
+With stationary supports, the \emph{product supports} are fixed once and for all:
+\[
+A'_{i,j}\ :=\ A_{0,i}\ \boxplus\ A_{1,j}\ \in [0,2N)^{t^2},\qquad
+B^{(s)}_{i,j}\ :=\ B^{(s)}_{0,i}\ \otimes\ B^{(s)}_{1,j}\ \in \mathbb F_q^{t^2},
+\]
+and
+\(
+e^{(s)}_{0,i}\cdot e^{(s)}_{1,j}=\mathsf{makePoly}\!\big(A'_{i,j},\,B^{(s)}_{i,j}\big)\bmod F(X).
+\)
+Thus, across $s=1,\dots,q$, the \emph{addresses} $A'_{i,j}$ never change; only the \emph{values} $B^{(s)}_{i,j}$ do.
+
+\paragraph{How Stationary applies to our pipeline.}
+The Ring-LPN PCG flow in \sectionref{subsec:ringlpn} already factors the heavy work into:
+(i) building (and then multiplying) the sparse polynomials, and
+(ii) routing those sparse contributions into the ring (and then into the NTT domain).
+Stationarity lets us push nearly all position-dependent work \emph{out of the per-expansion loop}:
+
+\begin{enumerate}
+  \item \textbf{One-time (setup).}
+  \begin{itemize}
+    \item Fix supports $A_{p,0},A_{p,1}$ and derive the four fixed product supports $A'_{i,j}$.
+    \item Precompute the position-only routing for each $A'_{i,j}$ with our new DMPF constructions: this fixes the level tags, permutations, and correction structure once. No payloads are embedded yet.
+  \end{itemize}
+
+  \item \textbf{Per expansion $s=1,\dots,q$.}
+  \begin{itemize}
+    \item Sample fresh coefficients $B^{(s)}_{p,i}$ (and fresh ring mask $r^{(s)}$); form $B^{(s)}_{i,j}=B^{(s)}_{0,i}\otimes B^{(s)}_{1,j}$.
+    \item \emph{Value-only programming:} reuse the cached routing for each fixed $A'_{i,j}$ and inject the new $B^{(s)}_{i,j}$ values (no recomputation of tags or inner-product gadgets). This is exactly the “payload injection” stage in our DMPF box, repeated with new shares.
+    \item Reduce $\sum_{i,j}\mathsf{makePoly}(A'_{i,j},B^{(s)}_{i,j})$ modulo $F(X)$ and proceed with the NTT and componentwise products to obtain the packed OLEs / triples.
+  \end{itemize}
+\end{enumerate}
+
+\paragraph{Cost implications.}
+Let $D=\lceil\log_2 N\rceil$ and recall $|A'_{i,j}|=t^2$.
+\begin{itemize}
+  \item \emph{Fresh (non-stationary):} each expansion repeats position discovery and routing, rebuilding the  structure for every $(i,j)$, plus programming values—this is where the original distributed approach paid an $n$-dependent price via $\SharedIPD$.
+  \item \emph{Stationary:} we pay the position-routing cost \emph{once}. Each expansion programs only the new values $B^{(s)}_{i,j}$ through the cached DPMF skeleton and then runs ring/NTT arithmetic. In our improved DPMF path, the per-expansion nonlinear work is $O(\mathrm{poly}(t))$ for the DMPF value path, independent of $N$; the arithmetic dominates (NTT and pointwise multiplies).
+\end{itemize}
+
+\paragraph{Practical takeaway.}
+For degree-2 correlations (Ring-LPN $\to$ packed OLE / triples), Stationary LPN perfectly matches the factorization in our construction:
+\begin{center}
+\emph{fix supports once} \(\Rightarrow\) \emph{precompute DPMF routing once} \(\Rightarrow\) \emph{per expansion: only new coefficients and ring arithmetic.}
+\end{center}
+This reduces the online cryptographic work to value injection on a fixed sparse footprint and lets the NTT-backed Goldilocks arithmetic drive overall throughput, which is precisely the regime where our implementation attains multi-million ops/sec.

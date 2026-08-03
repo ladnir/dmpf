@@ -1,0 +1,396 @@
+\section{Single Point DPF Constructions}\label{sec:dpf}
+
+
+We now review the standard DPF construction first presented in \cite{dpf,dpf2,dpfKeygen} generalize this protocol to allow efficient expansion over a sparse domain. The ideal functionality we target is presented in \figureref{fig:DpfFunc} which differs from prior works in several ways. Unlike some prior works we do not separate the DPF protocol into an key generation phase and then a non-interactive expansion phase. This is to bring the presentation of the paper in line with practice. In particular, by combining the two phases we eliminate the need to perform the tree expansion twice. The input to the functionality is a secret shared index $\alpha{\alpha}$ and a shared value $\share{\beta}$. The output is a secret shared vector $y$ such that at index $\alpha$ the vector has value $\beta$ while all other positions are zero, i.e. $y_\alpha = \beta$.
+
+Additionally, we allow the domain of the point function to be over some possibly sparse set $S\subseteq [0,N)$. The output vector $y$ is then defined at each position $y_i$ for $i\in S$. \cite{dpf,dpf2,dpfKeygen} only considered the setting with $S=[0,2^D]$. However, we will required this generalized definition. 
+
+\begin{figure}\hspace{-0cm}\small
+	\centering
+	\fbox{ \begin{minipage}{.95\textwidth}
+    For public parameters $N\in \mathbb{N}$, domain $S\subseteq [0,N)$ and group $\mathbb{G}$.\\
+    
+    On input $\share{\alpha}\in [0, N),\share{\beta}\in \mathbb{G}$, computes:
+    \begin{enumerate}
+        \item Let $y:=\unitVec_{\mathbb{G}^S}(\lfloor \alpha\rfloor_S, \beta)$.
+        \item Sample $\share{y}$.
+        \item Output $\share{y}_i$ to party $i$.
+    \end{enumerate}
+    \end{minipage}}
+\caption{%
+  (Single-Point) DPF Functionality over domain $S\subseteq [0,N)$ for some $N\in \mathbb{N}$.\label{fig:DpfFunc}
+}
+\end{figure}
+
+
+\iffalse
+\begin{figure}\hspace{-0cm}\small\vspace{-0.8cm}
+	\centering
+	\fbox{ \begin{minipage}{.95\textwidth}
+    For public parameters $n \in \mathbb{N}, N = 2^n, S \subseteq[0,N)$ and group $\mathbb{G}$ for $|S|>1$.\\
+    
+    $\mathcal{F}_\textsf{sparse-DPF}(\share{\alpha}\in S,\share{\beta}\in \mathbb{G}):$ 
+    \begin{enumerate}
+        \item Initialize a vector $y$ of length $|S|$.
+        \item $\alpha'\in [|S|]$ s.t. $\alpha=S_{\alpha'}$.
+        \item $y_{\alpha'}:= \beta$
+        \item for $i\in [|S|]\setminus \{\alpha'\}$: $y_i := 0$
+        \item output $\share{y}$.
+    \end{enumerate}
+    \end{minipage}}
+\caption{%
+ Sparse (Single-Point) DPF Functionality. \amit{Does it make sense to define (and realize) a multi-point version of this functionality ?} \amit{\Cref{fig:DpfFunc} is just a special case of this where $S = [0, N)$ so maybe we can remove \Cref{fig:DpfFunc} ?} \peter{its possible, lets decide when we start filling in the narative. The only concern is that you are complicating the other functionality to fit this one in. Lets see.  }
+  \label{fig:sparseDpfFunc}
+}\vspace{-1.0cm}
+\end{figure}
+\fi
+
+\subsection{Standard DPF Protocol}
+ 
+
+In this section we recall the classic tree--based Distributed Point Function (DPF) construction of Gilboa--Ishai \cite{dpf} (and its subsequent refinements \cite{dpf2,dpfKeygen}) and explain how the generalised $w$-ary version given in \figureref{fig:Dpf} realises the ideal functionality of \figureref{fig:DpfFunc}. This will be instructive for our new ``sparse'' version of the protocol presented in \sectionref{sec:sparse}. For clarity we first focus on the binary case $w=2$ and then note the (minor) changes required for larger branching factors.
+
+
+\paragraph{High-level intuition.}
+Each party locally expands a sequence of PRG seeds along the unique root-to-leaf path that leads to the index $\alpha$. The binary tree has $2^D$ leaves. The tree has the invariant:
+\begin{quotation}
+\noindent The $d$'th level of the tree is an XOR secret sharing of a unit vector $s=\unitVec(\alpha', r_d)$ and $t:=\unitVec(\alpha', 1)$ where $s_i,t_i$ is associated with node $i$, $r_d\in \FF_{2^\kappa}$ is some random value and $\alpha':=\prefix(\alpha, d)$ is the $d$ most significant bits of $\alpha$, i.e. $\prefix(\alpha, d):=\lfloor\alpha / 2^{D-d}\rfloor$.
+\end{quotation}
+
+The root level containing a single node can be set to a random sharing. Each level $d$ after that is constructed by the parties locally applying a PRG to their local share at each node. This results in two new shares for the children of the node. For nodes that were a sharing of zero, the children nodes will also be sharing of zero, i.e. for any $\share{z}$ with $z=0$ it holds that $\share{z'}_0:=\G(\share{z}_0), \share{z'}_1:=\G(\share{z}_1)$ is also a sharing of zero. 
+
+For the ``active'' node at index $\alpha':=\prefix(\alpha, d)$, the parties will hold $\share{s_{\alpha'}}$ with $s_{\alpha'}$ being some random value. Party $P_i$ will compute 
+$$
+    (\share{s'_{1+2\alpha'}}_i,\share{s'_{2+2\alpha'}}_i) := \G(\share{s_{1+\alpha'}}_i)
+$$ 
+where $s'$ is the sharing for the next level.
+Unfortunently, the fact that both children are random breaks the invariant that $s'$ is a unit vector with non-zero at index $\prefix(\alpha, d+1)$. To restore the invariant, the parties must then obliviously update their sharing such that the only the child at index $\prefix(\alpha, d+1)$ is non-zero. This is acheived with so called \emph{correction words} (the vectors $\sigma_d,\tau_d$ in \figureref{fig:Dpf}) and with the help of the $t$ vector which is 1 at index $\alpha'$. The remarkable fact of this protocol is that it only requires $O(1)$ communication per level, independent of the size of the level.
+
+\paragraph{Detailed walk-through.}
+
+\figureref{fig:Dpf} performs the following steps. We will omit the root node of the tree and begin with the next level which we label as the $D$'th level. The leaf level of the tree  will be referred to the $1$'st level. We will use zero indexing for the $s$ vector.
+\begin{enumerate}
+\item \textbf{Initial seed.} 
+Each party samples two $\kappa$-bit seed share $\share{s}\in \{0,1\}^{2\times \kappa}$ which forms the nodes for the $D$'th level. Each level is first constructed with two sibling nodes having random $s$ values and then we will correct the sibling node not on the $\alpha$ path to be zero. 
+
+The current level will be stored in the $\share{u}$ tuple consisting of the shared unit vector $\share{s}$ and a shared ``tag'' vector $\share{t}$.  $t_i=1$ if $s_i$ is current a random value and otherwise $t_i=0$. 
+
+ %. To address this the parties compute the sum of all left children $\share{z_0}$ and the sum of the right children $\share{z_1}$ for the current level. In the case $\share{z_0}:=\share{s_0},\share{z_1}:=\share{s_1}$ since there is only one.
+
+\item \textbf{Path decomposition.} The shared index is written in base $2$:
+$(\share{\alpha_{D}},\dots,\share{\alpha_{1}})$ $ := \decomp_{2}(\share\alpha)$
+\item \textbf{Depth iteration.} For each depth $d = D,\dots,2$:
+\begin{enumerate}
+    \item \emph{Left Right Sums}. The parties compute the sum of all left children $\share{z_1}$ and the sum of the right children $\share{z_2}$ for the current level, i.e. $\share{z_1}:=\oplus_i \share{s_{2i}},\share{z_2}:=\oplus_i\share{s_{2i+1}}$.
+    \item \emph{Reveal correction words.} Let $\alpha'=\compose_2(\alpha_D,...,\alpha_d)$ be the current prefix of $\alpha$. The parties want to update the value of $\share{s_{\alpha'\oplus 1}}$ to be zero without revealing $\alpha$. First observe that $s_{\alpha'\oplus 1}=z_{1+(\alpha_d\oplus 1)}$. The core idea is to compute $\share{\sigma} := \share{z_{1+(\share{\alpha_d}\oplus 1)}}$  using a pair of oblivious transfers to selectively reveal either $\share{z_1}$ or $\share{z_2}$ depending on $\share{\alpha_d}$. The parties then reveal $\sigma$ and update their shares approperately. 
+    
+    \item \emph{Updating the shares.} To update the shares, the core idea is to have the parties add $\share{t_i}\cdot \sigma$ into $\share{s_i}$. Recall that $t_i=1$ for all $s_i$ that are not zero, i.e. $i\in \{\alpha',\alpha'\oplus 1\}$. This will result in only $\share{s_{\alpha'}}$ having a random value while all others are zero and therefore the invariant is restored.
+
+    \item \emph{Expanding the next level.} Party $P_p$ then locally apply a PRG to each of their share $\share{s_i}_p$ to obtain two new shares 
+    $$
+        (\share{s'_{2i}}_p, \share{s'_{2i+1}}_p) := \G(\share{s_{i}}_p)
+    $$
+    The new shared vector $\share{s'}$ almost follows the invariant except that again, the two siblings on the active path are non-zero instead of just the one on the active path. The invariant is the restored on the next iteration. 
+
+    \item \emph{Updating the tags.} Although the $s$ shares have been fixed and used to expand the next level, the parties also need to compute the tag shares for the next level. The existing tag $t$ is one at both index $\alpha'$ as well as $\alpha\oplus 1$. The idea is that we will choose the value of $\sigma$ such that the least significant bit of $s_\alpha$ to be 1 and then define the next tag bits $\share{t_{2i}'}:=\share{t_{2i+1}'}:=\lsb(\share{s_i})$.
+
+    However, as describe this is not possible as the value of $\sigma$ is already fully determined if we want $s_{\alpha\oplus1}=0$. Therefore the full protocol is to reveal two values of $\sigma$, one for the left children $\sigma_1$ and one for the right children $\sigma_2$. They will share the same first $\kappa-1$ bits but the LSB of each is chosen such that $s_{\alpha\oplus1}=0$ and $s_{\alpha}=1$. 
+    
+    Note that this effectively reveals the least signficiant bit of the input to the PRG $\G$ and therefore reduced the security level by one bit. However, due to implementation considerations this reduction of security is considered worth while. Alternatively, one could define $\G$ to output $2\kappa+2$ bits to compensate.
+
+    \item \emph{Next iteration.} The parties then use $\share{s'},\share{t'}$ as the current values for the next iteration, i.e.\ $(\share{s},\share{t}) := (\share{s'},\share{t'})$.
+\end{enumerate}
+\item \textbf{Leaf processing ($d=1$).} The parties repeat the steps again one more time for $d=1$ except that the shares are not expanded using the PRG. For every leaf index $i$ the parties now hold a XOR shared
+value $\share{s_i}$ as well as the tag $\share{t_i}$ such that $s=\unitVec(\alpha, r)$ and $t=\unitVec(\alpha, 1)$, for some $r\in \{0,1\}^\kappa$. The leaf seeds must then be converted into the desired group $\GG$. This is achieved using the user-defined function $\convert:\{0,1\}^{\kappa-1}\rightarrow \GG$, which samples a pseudorandom element of $\GG$ given a uniform input. As discussed above, the LSB of $s_\alpha$ is forced to be 1 and therefore is not safe to input into $\convert$. We therefore define the converted leaf shares as $\share{y_i}:=\convert_\GG(\msbs(\share{s_i}))$, where $\msbs$ returns all but the least significant bit. Finally, if $\GG$ is not characteristic 2, it is necessary for one party to negate its values of $y$ to ensure additive reconstruction. 
+
+
+\item \textbf{Leaf correction.} The final step is to reveal the difference between the sum of the leaf values and the desired value $\beta$. For characteristic-2 groups, this is as simple as revealing $\gamma=\beta \oplus \bigoplus_i y_i$ and then adding $\share{t_i}\cdot \gamma$ into each output share $\share{y_i}.$ For non-characteristic-2 groups, the parties must conditionally negate $\gamma$ and update $y_i$ appropriately.
+\end{enumerate}
+
+\paragraph{Generalisation to $w>2$.}
+For larger branching factors the only substantive change is that $\sigma$ becomes length
+$w$ and each $\sigma_i$ must appear uniform instead of having a common $\kappa-1$ prefix. The complexity therefore scales linearly with $w$. A ternary choice
+$w=3$ has been advocated in recent work (i.e., FOLEAGE \cite{foleage}), where it works nicely with the base-3 indexing required for their PCG.
+
+
+
+\begin{figure}\hspace{-0cm}\small
+	\centering
+	\fbox{ \begin{minipage}{.95\textwidth}
+    
+    
+    $\correctionWord(\share{z}\in\{0,1\}^{w\times \kappa}, \share{\alpha}\in \{0,1\})$:
+    
+    \begin{enumerate}
+        \item if $w=2$: $\share{\sigma} := \zip(\msbs(\share{z_{\share{\alpha_d}\oplus 1}})\cdot (1,1),(\lsb(\share{z_1}) \oplus \share{\alpha_d}\oplus 1, \lsb(\share{z_2})\oplus \share{\alpha_d}))\in \{0,1\}^{2\times \kappa}$,\\
+        else:\ $\qquad\share{\sigma} := \share{z} \oplus \unitVec(\share{\alpha_{d}},\share{r}\concat 1)\in \{0,1\}^{w\times \kappa}$ where $\share{r}\gets\{0,1\}^{\kappa-1}$
+        \item return $\reveal(\share{\sigma})$
+    \end{enumerate}
+     
+
+    $\updateLeave_S(\share{y}\in\GG^{S}, \share{t}\in \{0,1\}^{S}, \share{\beta}\in \GG)$:
+    
+    \begin{enumerate}    
+        \item $\share{\gamma}:=\share{\beta} -\sum_{i\in S}\share{y_i}$,
+        \item if $\mathbb{G}$ is not characteristic 2:
+        \begin{enumerate}
+            \item $c_p:=\sum_{i\in S}\share{t_i}_p\in [0,|S|)$
+            \item $\share{d}_p:=c_p/2 + pc_p\mod 2$
+            \item $\share{\gamma}:=(1-2\share{d})\cdot \share{\gamma}$
+        \end{enumerate}
+        
+        \item $\gamma =\reveal(\share{\gamma})$
+        \item $\share{y_i}:=\share{y_i}+(1-2p)\gamma \share{t_i} $ for $i\in S$
+        \item return $\reveal(\share{y})$
+    \end{enumerate}
+    \end{minipage}}
+\caption{%
+ \correctionWord  \label{fig:correction}
+}
+\end{figure}
+
+
+
+\begin{figure}\hspace{-0cm}\small
+	\centering
+	\fbox{ \begin{minipage}{.95\textwidth}
+    For public parameters $\kappa,n,w\in \mathbb{N}$, group $\mathbb{G}$, PRG $\mathsf{G}:\{0,1\}^\kappa \rightarrow\{0,1\}^{w\times \kappa}$ , $D:=\lceil \log_w(n)\rceil$.\\
+    
+    On input $\share{\alpha}\in [0,n),\share{\beta}\in \mathbb{G}$, party $p\in \{0,1\}$ computes:
+    \begin{enumerate}
+        \item $\share{s}\gets \{0,1\}^{w\times\kappa},\share{z}:= \share{s}$%$,\share{k}:=\share{s}$
+        \item $\share{\state}:=\zip(\share{s},(1)^w), \share{\state'}:=()$
+        \item $(\share{\alpha_{D}},...,\share{\alpha_1}):=\mathsf{decomposition}_w(\share{\alpha})\in \mathbb{Z}_w^D$.
+        \item for $d\in [D,1]$:
+        \begin{enumerate}
+            \item $\sigma := \correctionWord(\share{z},\share{\alpha_d})$
+            %\item $\share{k}:=\share{k}\concat \sigma$
+            \item $\share{z}:= (0)^w$
+            \item if $d>1$: for $(j,(\share{s},\share{t}))\in \zip((1,2,1,2,...),\share{u})$:
+                \begin{enumerate}
+                    \item $\share{s}:=\share{s} \oplus\share{t} \cdot \sigma_{j}$ 
+                    \item $\share{s'}_p := \mathsf{G}(\share{s}_p)$ 
+                    \item $\share{z}:=\share{z}\oplus \share{s'}$
+                    \item $\share{\state'}:=\share{\state'}\concat \zip(\share{s'},\lsb(\share{s})\cdot (1)^w))$
+                \end{enumerate}
+                
+            \item if $d=1$: for $(i,j,(\share{s},\share{t'}))\in \zip([0,n),(1,2,1,2,...), \share{u}):$
+            \begin{enumerate}
+                \item $\share{s}:=\share{s} \oplus\share{t'} \cdot \sigma_{j}$ 
+                \item $\share{t_i}:=\lsb(\share{s})$
+                \item $\share{y_i}_p:=(1-2p)\cdot \convert_{\mathbb{G}}(\msbs(\share{s}_p))$
+            \end{enumerate}
+            \item $\share{\state}:=\share{\state'}, \share{\state'}:=()$. 
+        \end{enumerate}
+
+        \item return $\updateLeave_{[0,n)}(\share{y}, \share{t}, \share{\beta})$
+        %\item if $\mathbb{G}$ is characteristic 2: $\share{\gamma}:=\share{\beta} \oplus\bigoplus_{i\in [0,n)}\share{y_i}$,\\
+        %else:
+        %\begin{enumerate}
+        %    \item $c_p:=\sum_{i\in [0,n)}\share{t_i}_p\in [0,n)$
+        %    \item $\share{d}_p:=c_p/2\mod 2$
+        %    \item
+        %    $\share{\gamma}:=(1-2\share{d})\cdot (\share{\beta} +\sum_{i\in [0,n)}\share{y_i})$
+        %\end{enumerate}
+        
+        %\item $\gamma =\reveal(\share{\gamma})$
+        %\item $\share{k}:=\share{k}\concat \gamma$
+        %\item $\share{y_i}:=\share{y_i}+(1-2p)\gamma \share{t_i} $ for $i\in [0,n)$
+        %\item return $\share{y}$%$, \share{k}$.
+    \end{enumerate}
+    \end{minipage}}
+\caption{%
+  $w$-arity (Single-Point) Distributed Point Function (DPF) protocol realizing \Cref{fig:DpfFunc}.\label{fig:Dpf}
+}
+\end{figure}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\subsection{Sparse DPF}\label{sec:sparse}
+
+The standard DPF above expands a \emph{full} depth-$D$ tree with $2^{D}$ leaves, paying work proportional to the domain size even when the target set~$S\subseteq[0,2^{D})$ contains only a handful of indices.  When $|S|\ll 2^{D}$  we observe that it is possible to substantually optimize the construction.  Our \emph{sparse DPF} achieves this by pruning every internal node whose entire sub-tree contains at most one live leaf; in our new construction such nodes carry the same PRG seed to their unique child and need \emph{no} correction words.  
+
+\begin{figure}\hspace{-0cm}\small
+	\centering
+	\fbox{ \begin{minipage}{.95\textwidth}
+    
+    
+    $\partition(\beta\in\mathbb{N}^2, S\subset \mathbb{N})$:
+    
+    \begin{enumerate}
+        \item if $\beta_1=\beta_2$, return $(0,(\beta,\bot))$.
+        \item let $\delta:=\mathsf{max}(\{d\mid \left\{s_d \mid s\in \{S_{\beta_1},...,S_{\beta_2}\right\}, (s_D,....,s_1):=\bitDecomp(s)\} $ $= \{0,1\}\})$.
+        \item let $b\in \mathbb{N}^{2\times 2}$ s.t. $b_1:=(\beta_1,\beta_1+m),b_2:=(\beta_1+m+1,\beta_2)$ where $m:=|\{s \mid s_\delta=0\}|$.
+        \item return $(\delta, b)$.
+    \end{enumerate}
+    \end{minipage}}
+\caption{%
+ \partition, returns the largest bit index $\delta$ that partitions the subset $\{S_{\beta_1},...,S_{\beta_2}\}$ into two parts, along with the partitions intervals $b_1,b_2$. If no parition exists, $\delta=0,b=(\beta,\bot)$. For example, $\beta=(2,7), S=\{0001,0010,0100,0101,1000,1001,1010,1101,1111\}$ results in $(\delta,b)=(4,((2,4),(5,7)))$ representing the ranges $\{0010,0100,0101\},\{1000,1001,1010\}$. \label{fig:partition}
+}
+\end{figure}\vspace{-0.8cm}
+
+
+Fix a depth $D$ so that every index in $S$ has a $D$-bit binary representation. We conceptually embed $S$ in the complete binary tree $\{0,1\}^{D}$ but logically constract all nodes with one child. Hence all internal nodes have exactly two children but these children might reside at more than one level down. 
+
+\begin{figure}[ht]\hspace{-0cm}\small
+	\centering
+	\fbox{ \begin{minipage}{.95\textwidth}
+    For public parameters $D\in \mathbb{N}, S\subseteq[0,2^D)$ and group $\mathbb{G}$ for $|S|>1$.\\
+    
+    $\textsf{sparse-DPF}(\share{\alpha}\in [0,2^D),\share{\beta}\in \mathbb{G}):$ 
+    Party $p\in \{0,1\}$ computes:
+    \begin{enumerate}
+        \item $\state_i:=\emptyset,\share{z_i}:=\{0\}^2,\share{v_i}=1$ for $i\in [0,D]$.
+        \item $S:=\mathsf{sort}(S)$
+        \item $(\delta,b):= \partition((1,|S|),S)$
+        %\item $c:=\{0\}^{D\times 2}$.
+        \item for $j \in \{0,1\}$:
+        \begin{enumerate}
+            \item $(\delta',b'):=\partition(b_j, S)$.
+            \item $\share{s}\gets \{0,1\}^\kappa, \share{z_{\delta,j}}:=\share{s},\share{v_\delta}=1$
+            \item $\state_{\delta'}:=\append(\state_{\delta'},(j,\delta, b', \share{s}, \share{1}))$ 
+        \end{enumerate}
+        \item $(\share{\alpha_{D}},...,\share{\alpha_1}):=\bitDecomp(\share{\alpha})$.
+        \item for $d\in \{D, D-1,....,1\}$:
+        \begin{enumerate}
+            \item if $|u_d|=0$, continue.
+            \item $\share{z_d}:=\share{z_d} \oplus (\neg \share{v_d}) \share{r}$ where $\share{r}\gets \{0,1\}^{2\times\kappa}$
+            \item $\sigma := \correctionWord(\share{z_d},\share{\alpha_d})$
+            \item for $(j,\rho, b,\share{s},\share{t}) \in \state_{d}$:
+            \begin{enumerate}         
+                \item $\share{s}:=\share{s} \oplus\share{t} \cdot \sigma_{\rho, j}$ 
+                
+                \item $\share{s'}_p := \mathsf{G}(\share{s}_p)$ 
+                \item $\share{z_{d-1}}:=\share{z_{d-1}}\oplus \share{s'}, \share{v_{d-1}}:=\share{v_{d-1}} \oplus \lsb(\share{s})$
+                \item for $k\in \{1,2\}$
+                \begin{enumerate}
+                    \item $(\delta, b'):= \partition(b_k,S)$
+                    \item $\state_{\delta}:=\append(\state_{\delta},(k,d-1,b', \share{s_k'}, \lsb(\share{s})))$ 
+                \end{enumerate}
+            \end{enumerate}
+        \end{enumerate}
+        \item for $(j,\rho,b,\share{s},\share{t})\in \state_0$
+        \begin{enumerate}
+            \item $\share{s}:=\share{s} \oplus\share{t} \cdot \sigma_{\rho,j}$             
+            \item $\share{t_{b_1}}:=\lsb(\share{s})$
+            \item $\share{y_{b_1}}:=(1-2p)\cdot \convert_\mathbb{G}(\msbs(\share{s}))$
+        \end{enumerate}
+        
+        \item return $\updateLeave_{S}(\share{y}, \share{t}, \share{\beta})$
+    \end{enumerate}
+    \end{minipage}}
+\caption{%
+ Sparse (Single-Point) DPF. \label{fig:sparseDpf}\vspace{-0.5cm}
+}
+\end{figure}
+
+To efficiently expand such a sparse tree, it is important not explicitly represent nodes with a single child. Instead, when a node is expanded, we must be able to determine the next level that each of the children will be expanded or if it is a leaf node. To keep tract of the state of the tree, we use the $u_d$ vector which stores all shares that need to be expanded at level $d$. As before, level $D$ will be the closest to the root while level 1 will be the closest to the leaves. 
+
+For each level, $u_d$ will be a list of tuples $(j,\rho, b,\share{s},\share{t})$ where 
+\begin{itemize}
+    \item $j\in\{0,1\}$ denote if the current node is a left or right child.
+    \item $\rho\in [D]$ denotes the level of the parent.
+    \item $b\in [|S|]^2$ denote the index range that this node corresponds to, i.e. $S_{[b_1, b_2]}$.
+    \item $\share{s}\in \{0,1\}^k$ is the current node value.
+    \item $\share{t}\in \{0,1\}$ is the tag which is 1 when $s$ is set to random.
+\end{itemize}
+
+The procedure \texttt{partition} (\figureref{fig:partition}) takes an index range $\beta\in [|S|]^2$ and returns the highest bit index~$\delta\in [D]$ that still splits the current interval of leaves into a non-empty left and right part, together with those two index ranges $l,r$ such that $[l_1,l_2] || [r_1, r_2] = [\beta_1,\beta_2]$. Given the range $\beta$ this function tells us that this range needs to be split at level $\delta$ with subranges $[l_1,l_2], [r_1, r_2]$ for the left and right children. This will enable the expansion to prune all internal nodes that have only one child.
+
+
+
+
+
+
+The algorithm can be read in five logical phases.  
+For clarity we refer to the line numbers that appear in \figureref{fig:sparseDpf}.
+
+\begin{itemize}
+
+%---------------------------------------------------------------
+\item \textbf{Book-keeping initialisation (steps 1,2).}  
+      Each depth $d\in[0,D]$ stores
+      \begin{itemize}
+        \item a bucket $u_d$ that will hold the \emph{live} seeds on that level,
+        \item a running sum $z_{d,1}$ and $z_{d,2}$ of all left and right $s$ values at level $d$
+      \end{itemize}
+      All structures start empty/zero and are added to in a breadth first manner.
+
+%---------------------------------------------------------------
+\item \textbf{Partitioning the root (steps 3,4)}  
+      We call $(\delta, b):=\partition((1,|S|), S)$ to find the
+      top-most bit $\delta$ at which the tree first branches (presumably $D$).  
+      For each of the children, the leaves $S_{[b_{1,1},b_{1,2}]}$ live under the left child and $S_{[b_{2,1},b_{2,2}]}$ under the right child. Each of these nodes will be assigned a random $\share{s}$ value. Partition is then called again $(\delta',b'):=\partition(b_j,S)$ to determine the level that the $j$'th child will be updated at with it's correction word and then split again or assigned to a leaf. The relevant tuple for this child is then added to $u_{\delta'}$. Note that at this time these seeds have not yet been updated and therefore the invariant that each level represents a unit vector has not yet been achieved. 
+      
+%---------------------------------------------------------------
+\item \textbf{Top-down expansion (steps 5,6).}  
+      Write the secret index as a bit string
+      $(\share{\alpha_D},\dots,\share{\alpha_1})$.  
+      For each depth $d=D,\dots,1$ we do:
+      \begin{enumerate}[label=\textit{\alph*)}]
+        \item \emph{Randomizing the sums.} 
+            In the event that the \emph{active path} does not split on this level, the sums $\share{z_1},\share{z_2}$ will both be zero. As such, the correction word will also be zero which leaks this fact. To prevent this, we randomize the sums. $\share{v_d}\in \{0,1\}$ keeps tract of if this level requires randomization. 
+
+        \item \emph{Compute and reveal correction words.}  
+              We construct the correction word using the same $\sigma:=\correctionWord(\share{z_d}, \share{\alpha_d})$ subprotocol which returns two elements $\sigma_1,\sigma_2\in \{0,1\}^\kappa$.
+        \item \emph{Updating the shares.}  
+              Each tuple
+              $(j,\rho,b,[\![s]\!],[\![t]\!])\in u_d$ is updated by  
+              computing $\share{s}:=\share{s}\oplus \share{t} \cdot \sigma_j$. Recall that this maps the seed on the $\alpha$ path to being random subject to the LSB being 1 and maps its sibling to being zero.  This restores the invarant that the $s$ values at level $d$ form a unit vector. 
+              
+        \item \emph{Computing Child values.} The children $s$ values are then locally computed as $\share{s'}_p:=\G(\share{s}_p)$. This level almost stasfies the invariant except that the sibling to the $\alpha$ path is also random which will be corrected in subsquent iterations. The $z$ sums for the children are updated.
+
+        \item \emph{Partitioning the chidren.} Each of the children $k\in\{1,2\}$ are then partitioned, $(\delta, b'):=\partition(b_k, S)$ which tells us that this child will next be used at level $\delta$ and have subranges $S_{[b'_{1,1},b'_{1,2}]}$ and  $S_{[b'_{2,1},b'_{2,2}]}$ for its left and right children. The relavent tuple is then pushed onto the $u_\delta$ list to be processed at iteration $\delta$.
+
+        In the event that this value should be assigned to a leaf, \partition will return $\delta=0$ and the value will be stored in the special ``leaf'' list $u_0$.
+      \end{enumerate}
+
+%---------------------------------------------------------------
+\item \textbf{Leaf processing (step 7).}  
+      Every tuple that now resides in $u_0$ corresponds to a \emph{leaf}
+      $i\in S$ and have yet to be updated to form a unit vector. In particular, two of the $s$ values will be random. Each value is updated such that the leaf at $\alpha$ has an LSB of 1 and the other leaf is set to zero. 
+
+      Finally, the leaf values are locally converted into elements in $\GG$ using the \convert procedure. If neccessary, the shares are negated. The result is an additive sharing of a random unit vector $y=\unitVec(\alpha, r)\in \GG^S$ and binary unit vector $t=\unitVec(\alpha, 1)\in \{0,1\}^S$ for some random $r\in \GG$.
+
+      %$[\![t_i]\!]\leftarrow\text{lsb}(s_i)\oplus t_i\cdot\tau_{0,j}$
+      %and convert the remaining $\kappa-1$ bits of
+      %$s_i\oplus t_i\cdot\sigma_0$ into a pseudorandom share
+      %$[\![y_i]\!]$ with the user-supplied function
+      %\texttt{convert\_G} :contentReference[oaicite:4]{index=4}.
+
+%---------------------------------------------------------------
+\item \textbf{Derandomizing the leaves (step 8).}
+    Finally, the leaf values are updated so that the leaf value at index $\alpha$ is converted from $r$ into the desired leaf value $\beta$. This is achieved using the previous $\updateLeave$ subprotocol.
+\end{itemize}
+
+\smallskip
+\noindent
+\emph{Complexity recap.}  
+Communication consists of $O(\kappa)$ bits per level of the tree that has a split. This is therefore at most $O(D\kappa)$ bits. In terms of computation, only the leaves and nodes with two children are processes. It is not hard to see that there are $|S|$ leaves and $|S|-1$ splits. Therefore the protocol only requires $O(|S|)$ work (calls to the PRG).
+
+\noindent
+\emph{Generalisation to $w$-ary branching.}
+Replacing binary with $w$-ary trees follows the same pattern: every internal node now has $1,\dots,w$ live children and correction words are needed only when at least two children survive.  \figureref{fig:sparseDpf} shows the algorithm for $w=2$.
+

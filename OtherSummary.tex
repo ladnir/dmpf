@@ -1,0 +1,21 @@
+\section{Other Constructions}
+
+
+
+In addition to Reverse Cuckoo, we develop two complementary DMPF variants that are useful in
+specific parameter regimes.
+
+\paragraph{Bucketing.}
+When indices are (approximately) uniform, we partition the domain into $k$ buckets and apply a
+DMPF independently per bucket on a smaller subdomain. With $k \approx t/\log t$, standard
+concentration bounds imply that each bucket contains $O(\log t)$ items with high probability,
+yielding an overall $O(t)$-scale key-generation and evaluation profile (up to logarithmic factors),
+and allowing substantial parallelism. The group-by (frequency counting and padded regrouping)
+machinery and parameterization details are provided in the appendix. See \sectionref{sec:bucketing} for details.
+
+\paragraph{Big-State.}
+We also cover the big-state paradigm and provide two fully distributed key-generation paths.
+The first is a black-box approach inspired by Reverse Cuckoo's assignment/solving viewpoint;
+the second evaluates the trusted-dealer-style big-state key generation inside generic MPC using
+an MPC-friendly PRG instantiation, trading custom distributed subprotocols for engineering
+simplicity. The complete protocols and tradeoffs are deferred to the appendix. See \sectionref{sec:bigState} for details.

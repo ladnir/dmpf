@@ -1,0 +1,273 @@
+
+
+\subsection{System Solver}\label{sec:solver}
+
+The $\textsf{bin-solver}$ protocol solves a binary linear system $M \in \mathbb{F}_2^{m \times c}$ with right-hand side $y \in \mathbb{G}^m$, where computation occurs in a characteristic-2 group $\mathbb{G}$. The inputs are secret-shared, and the protocol outputs a secret-shared solution $x \in \mathbb{G}^c$ such that $Mx = y$.
+
+\begin{enumerate}
+    \item \textbf{Row Elimination:} For each row $i \in [m]$:
+    \begin{enumerate}
+        \item Find a pivot column $j$ such that $M_{i,j} = 1$, and set $s_i := \mathsf{unitVector}(j, 1)$ if $j$ exists and otherwise set $s_i = 0$.
+        \item Compute the active column $v := M\cdot  s_i$, the vector corresponding to column $j$.
+        \item For each row $j \in [m] \setminus \{i\}$, eliminate the pivot bit. This is done by performing row operations. For each row that is active and not $i$, we subtract row $i$ from it. This is done by:
+        \begin{enumerate}
+            \item Update matrix row: \(M_j := M_j \oplus v_j \cdot M_i\)
+            \item Update RHS: \(y_j := y_j \oplus v_j \cdot y_i\)
+        \end{enumerate}
+    \end{enumerate}
+
+    \item \textbf{Combine Support Vectors:} Compute the vector $\sigma\in \mathbb{F}^c_2$ where $\sigma_j=1$ means that column $j$ of $M$ and position $j$ in $x$ is used to solve the system. That is:
+    \[
+    \sigma := \bigoplus_{s \in [m]} [s_i]
+    \]
+    Similarly, compute the set of ``free variables'' in $x$ by taking the complement.
+    \[\overline{\sigma} := (1)^c \oplus \sigma 
+    \]
+    
+
+    \item \textbf{Sample Free Variables:} To produce a random solution we first assign random values to the free bariables, i.e. $x \leftarrow \mathbb{G}^c \odot \overline{\sigma}$
+
+    \item \textbf{Back-substitute:} We then update the $y$ values to cancel the random values assign to the free variables, i.e. $y := y \oplus M*x$.
+
+    \item \textbf{Recover Solution:} We then route the final values for $x$ which are currently stored in $y$. The routing is simply the $s$ permutation matrix, i.e. $x := x \oplus s \cdot y$.
+    \item \textbf{Output:} Return the final solution $x$.
+\end{enumerate}
+
+
+\begin{figure}\small
+	\centering
+	\fbox{ \begin{minipage}{.95\textwidth}
+    Public parameters, a characturistic 2 group $\mathbb{G}$.\\
+    \vspace{10px}
+   $\textsf{bin-solver}(\share{M}\in \mathbb{F}_2^{m\times c}, \share{y}\in \mathbb{G}^m)$, party $p\in \{0,1\}$ computes:
+\begin{enumerate}
+    \item for $i \in [m]$:
+    \begin{enumerate}
+        \item $\share{s_i} := \unitVec(\share{j},1)\in \mathbb{F}_2^c$ s.t. $\share{M_{i,j}} = 1$. If no $j$ exists, let $s_i=0$.
+        \item $\share{v} :=\share{M} \cdot \share{s_{i}}\in \mathbb{F}_2^m$
+        \item for $j\in [m]\setminus\{i\}$:
+        \begin{enumerate}
+            \item $\share{M_j}:=\share{M_j} \oplus \share{v_j} \cdot \share{M_i}$ 
+            \item $\share{y_j}:=\share{y_j} \oplus\share{v_j} \cdot \share{y_i}$
+        \end{enumerate}
+    \end{enumerate}
+    
+    \item $\share{\sigma}:=\bigoplus_{s\in [m]} \share{s_i} \in \mathbb{F}^c_2$
+    \item $\share{\overline{\sigma}} :=  (1)^c \oplus \share{\sigma}$
+    \item $\share{x}\gets \mathbb{G}^c\odot \share{\overline{\sigma}}$
+    \item $\share{y}:=\share{y}\oplus \share{M}\cdot \share{x}$
+    
+    \item $\share{x}:=\share{x}\oplus  \share{s}\cdot \share{y}$
+    \item output $\share{x}$
+\end{enumerate}
+    \end{minipage}}
+\caption{Randomized binary system solver.\label{fig:binSolver}
+}
+\end{figure}
+
+
+
+Figure \ref{fig:binSolver} has the following complexity
+\begin{itemize}
+    \item step 1a requires $m(2 c-3)$ AND gates, and $m2\log_2(c)$ rounds.
+    \item step 1b requires $O(mc)$ OTs, $O(mc^2)$ bits of comm, and $O(m)$ rounds.
+    \item step 1c requires $O(m^2)$ OTs, $O(mc^2)$ bits of comm, and $O(m)$ rounds.
+    \item step 4 requires $O(c)$ OTs, $O(c\log |\mathbb{G}|)$ bits, and 1 round.
+    \item step 5 requires $O(c\log |\mathbb{G}|)$ OTs, $O(mc\log |\mathbb{G}|)$ bits, and 1 round.
+    \item step 6 requires $O(m\log |\mathbb{G}|)$ OTs, $O(mc\log |\mathbb{G}|)$ bits, and 1 round.
+\end{itemize}
+
+\noindent Therefore, overall we have $O(m\log c)$ rounds, $O(cm+c\log |\mathbb{G}|)$ OTs, and $O(mc^2+ mc\log |\mathbb{G}|)$ bits of communication.
+
+
+
+
+
+\begin{figure}\small
+	\centering
+	\fbox{ \begin{minipage}{.95\textwidth}
+    Public parameters: a group $\mathbb{G}$.\\
+    \vspace{10px}
+   $\dedup(\share{A}\in \mathbb{G}^n, \share{B}\in \mathbb{G}^n, \share{A'}\in \mathbb{G})$, party $p\in \{0,1\}$ computes:
+    \begin{enumerate}
+        \item  for $i\in [n], j\in [i,n]$:$\share{c_{i,j}}:=\textsf{eq}(\share{A_i},\share{A_j})$ 
+        \item for $i\in [n]$: 
+        \begin{enumerate}
+            \item $\share{d_{i}}:= \neg\bigvee_{k\in [i-1]} \share{c_{k,i}}$ 
+            \item $\share{c_i}:=\share{d_i}\share{c_i}$
+            \item $\share{A_i}:=\share{d_{i}}\share{A_i} \oplus \overline{\share{d_i}}\share{A'}$
+            \item for $j\in [i,n]:$ $\share{B'_{i,j}}:=\share{B_{i}}\share{c_{i,j}}$
+        \end{enumerate}
+        \item return $(\share{A},\share{B})$
+    \end{enumerate}
+    \end{minipage}}
+\caption{Debuplicate protocol with values.\label{fig:debup}
+}
+\end{figure}
+
+
+\subsection{Dedup Protocol} \label{sec:dedup}
+The $\mathsf{dedup}$ protocol takes as input secret-shared keys $[A] \in \mathbb{G}^n$ and associated values $[B] \in \mathbb{G}^n$, along with a dummy key $[A'] \in \mathbb{G}$. The goal is to remove duplicate keys: all values associated with duplicate keys are added to the first occurrence, and subsequent duplicates are replaced with a dummy key and zero value.
+
+\begin{enumerate}
+    \item \textbf{Equality Check:} For all $i \in [n]$ and $j \in [i, n]$, compute
+    \[
+    [c_{i,j}] := \mathsf{eq}([A_i], [A_j])
+    \]
+    which returns a secret-shared bit indicating whether $A_i = A_j$.
+
+    \item \textbf{First Occurrence Detection and Deduplication:} For each $i \in [n]$:
+    \begin{enumerate}
+        \item Compute a bit indicating whether $A_i$ is the first occurrence of its key:
+        \[
+        [d_i] := \neg \bigvee_{k \in [i-1]} [c_{k,i}]
+        \]
+        This bit is $1$ if and only if $A_i$ has not occurred previously.
+
+        \item Define a control bit $[c_i]$ to enable value accumulation only for first occurrences:
+        \[
+        [c_i] := [d_i] \cdot [c_i]
+        \]
+
+        \item Replace duplicate keys with the dummy key $[A']$:
+        \[
+        [A_i] := [d_i] \cdot [A_i] \oplus (\neg [d_i]) \cdot [A']
+        \]
+
+        \item For $j \in [i, n]$, zero out duplicate values using the pairwise comparison bits:
+        \[
+        [B_{i,j}] := [B_{i,j}] \cdot [c_{i,j}]
+        \]
+    \end{enumerate}
+
+    \item \textbf{Output:} Return the modified keys and values:
+    \[
+    \text{return } ([A], [B])
+    \]
+\end{enumerate}
+
+The result is that for each set of equal keys, only the first occurrence remains, and all associated values are added to that index. All subsequent duplicates are replaced with the dummy key $A'$ and their values are set to zero.
+
+\subsection{Hashing Protocol}\label{sec:hash}
+
+Our hashing layer is used only to ensure that, after shuffling, each block
+matrix $M_i$ (formed from rows $H_i(A_{g+1}),\dots,H_i(A_{g+d})$) is invertible
+over $\mathbb F_2$ with overwhelming probability. We do \emph{not} require
+cryptographic strength (e.g., collision or preimage resistance). Instead, we
+require that—once the inputs are fixed and the hash seed is sampled—the
+resulting row sets is full rank with high probability.
+
+\paragraph{Goal and minimal requirements.}
+Let $H_i : \{0,1\}^{\log N} \to \{0,1\}^q$ be $w$ independently seeded
+functions with $H_i(N)=0$ for the dummy key. For each block $i\in[w]$ we form
+the $d\times q$ matrix
+\[
+M_i \;=\;
+\begin{bmatrix}
+H_i(A_{g+1}) \\ \vdots \\ H_i(A_{g+d})
+\end{bmatrix},
+\qquad g:=(i-1)d.
+\]
+The \emph{minimal requirement} is:
+\[
+\mathrm{rank}_{\mathbb F_2}(M_i) \;=\; d \quad\text{for all } i\in[w].
+\]
+Equivalently, the $d$ rows are linearly independent over $\mathbb F_2$. This
+guarantees the linear systems we solve to define $h_i$ have solutions (and,
+with our randomized treatment of free variables, yield a valid random solution
+when $q>d$).
+
+A standard counting argument gives the following bound if, conditioned on fixed
+inputs, each row of $M_i$ is distributed close to uniform and independently
+over $\{0,1\}^q$:
+\[
+\Pr\big[\mathrm{rank}(M_i)<d\big]
+\;\le\; \sum_{j=0}^{d-1} 2^{j-q}
+\;\le\; 2^{-(q-d)}.
+\]
+Thus choosing $q \ge d + \lambda$ yields failure probability at most
+$2^{-\lambda}$ per block. (Union-bounding over $w=O(1)$ blocks preserves
+$2^{-\lambda}$ up to a constant factor.)
+
+\paragraph{Difference from a cryptographic hash.}
+\begin{itemize}
+  \item \textbf{What we need:} post-hoc \emph{algebraic genericity}
+  (full row rank) when the seed is sampled after inputs are fixed.
+  \item \textbf{What we do not need:} collision resistance, preimage resistance,
+  or random-oracle behavior.
+  \item \textbf{Adversary model:} inputs $(A_i)$ may be adversarially chosen,
+  but the seed is sampled independently \emph{after} inputs are fixed; our
+  requirement is that, under this seeding, the induced $M_i$ is full-rank with
+  high probability.
+\end{itemize}
+This is closer in spirit to $k$-wise independent hashing or random linear
+embeddings than to cryptographic hashing.
+
+\paragraph{Conservative parameter choice.}
+Throughout we set
+\[
+q \;=\; d + \lambda,
+\]
+We also keep the $H_i$ seeds independent across
+blocks and enforce $H_i(N)=0$ so padding rows are neutral.
+
+\paragraph{A Goldreich-style hash (seeded, non-cryptographic).}
+We now describe a simple, efficient, Goldreich-PRG -- inspired family that we conjecture meets
+the above rank requirement while remaining MPC-friendly.
+
+\subparagraph{Interface.}
+A hash instance is parameterized by a seed and three binary matrices:
+\[
+M_0 \in \{0,1\}^{q'\times \ell}, \quad
+M_1 \in \{0,1\}^{q'\times \ell}, \quad
+M_2 \in \{0,1\}^{q\times (\ell+q')},
+\]
+where $\ell=\log N$ and $q'$ is an \emph{intermediate width}. Given
+$x\in\{0,1\}^\ell$, define:
+\begin{enumerate}
+  \item $a = M_0 x \in \{0,1\}^{q'}$,
+  \item $b = M_1 x \in \{0,1\}^{q'}$,
+  \item $c = a \wedge b \in \{0,1\}^{q'}$ (bitwise AND),
+  \item $y = M_2 \cdot (x \,\|\,  c) \in \{0,1\}^q$.
+\end{enumerate}
+%Optionally, one designated output bit is flipped according to the party index to decorrelate views in the 2-party evaluation; this does not affect rank.
+
+\subparagraph{Rationale.}
+\begin{itemize}
+  \item The maps $x\mapsto M_0x$ and $x\mapsto M_1x$ are linear and yield rows
+  close to uniform for random $M_0,M_1$.
+  \item The coordinate-wise AND $a\wedge b$ injects mild nonlinearity
+  reminiscent of Goldreich's generator, which helps break residual linear
+  structure.
+  \item The final compression $M_2(x\|\! \, c)$ produces the target width $q$ while
+  preserving enough randomness so that each block matrix $M_i$ behaves as a
+  random $d\times q$ binary matrix for rank analysis.
+\end{itemize}
+
+\subparagraph{Dummy key constraint.}
+We enforce $H(N)=0$ by programming the seed so that $(M_0,M_1,M_2)$ maps $x=N$
+to $0^q$. In practice this can be done by coset-shifting the rows of $M_2$ so
+that $H(N)=0$ holds exactly without perturbing the distribution on non-dummy
+inputs.
+
+\subparagraph{Parameters and checks.}
+\begin{itemize}
+  \item Choose $q' \ge q$ (e.g., $q'=q$ or $q'=2q$).
+  \item Use independent seeds per block to avoid cross-block dependencies.
+\end{itemize}
+
+\paragraph{MPC-friendliness.}
+The construction is linear except for the $a\wedge b$ step, which is a bitwise
+multiplication supported efficiently via our \textsf{DpfMult} primitive. The
+rest are matrix-vector products over $\mathbb F_2$. Communication is dominated
+by the single batched secure bit-multiplication over $q'$ bits per input, which
+is negligible relative to the downstream Sparse-DPF bandwidth.
+
+\medskip\noindent
+\textbf{Takeaway.} We only need seeded, post-hoc full-rank guarantees—not
+cryptographic hashing. A simple Goldreich-style hash with two linear sketches,
+a coordinate-wise AND, and a final linear compression provides (i) close-to-uniform
+row distributions conditioned on fixed inputs and fresh seeds, (ii) independence
+across rows and blocks, and hence (iii) full-rank $M_i$ with probability
+$\ge 1-2^{-(q-d)}$ by setting $q\ge d+\lambda'$. We performed an evaluation that this does result in the desired properties for relavent parameters. We also note that other constructions could be used with minimal impact on overall performance.
+

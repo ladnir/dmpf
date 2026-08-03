@@ -1,0 +1,73 @@
+
+\section{Distirbuted Multi-Point Functions (DMPF)}
+
+\subsection{Reverse Cuckoo DMPF}
+
+\iffalse
+The parties sample $t$ sparse polynomials $A,B$ of degree $n$. Each party inputs these polynomials into MPC in sparse format. They compute the $t'=t^2$ sparse polynomials $C=AB$ of size $N=2n$.
+
+If $A,B$ contains non-zeros at $P_A,P_B$ with values $V_A,V_B$ respectively, then $P_C=\{ a+b \mid a\in P_A,b\in P_B\}$ and $V_C=\{ ab \mid a\in V_A,b\in V_B\}$.
+
+We will construct $t'$ point functions with a total of $N$ outputs. In this sense the point functions are ``optimal''. However, it introduces some other overheads.
+
+\begin{enumerate}
+    \item The parties input $P_A,P_B,V_A,V_B$ into the MPC.
+    \item MPC computes 
+    \begin{enumerate}
+        \item $P_C,V_C$.
+    \item MPC computes for $i\in P_C$, let $h_i=H(i)\in \mathbb{Z}_{t'}^{ct'}$.
+    \item Let $H=\begin{bmatrix}
+        h_{P_{C,1}}\\
+        ...\\
+        h_{P_{C,t'}}
+    \end{bmatrix}$.
+    \item Solve for $s\in \mathbb{Z}_{t'}^{ct'}$ s.t. 
+    $
+        H\cdot s = \begin{bmatrix}
+            0\\
+            1\\
+            ...\\
+            t'-1
+        \end{bmatrix}
+    $
+    \item the MPC outputs $s$ and sharing $\share{P_{C,1}},\share{V_{C,1}}$.
+    \end{enumerate}
+    \item For $i\in [N],$ the parties compute $d_i=\langle H(i), s\rangle$.
+    \item For $j\in[t]$, let $k_j$ be the sorted vector of $i$ s.t. $d_i=j$.
+    \item The parties construct $t$ point functions. The $j$ point function will have $|k_j|$ outputs, with the $i$ output element being mapped to position $k_{j,i}\in [N].$
+
+    The parties cache $k_{j,i}$.
+
+    \item For $i\in [n],$ let $j,d$ s.t. $k_{j,d}=i$ and define $D_i={d}$. The parties construct a cuckoo hash table $T$ of with keys $[N]$ and values $D$.
+
+    \item using batched PIR techniques, in MPC $t'$ secret shared batched PIR queries $\share{Q_1},...,\share{Q_{t'}}$ are constructed  into a database of size $N$ with indices $P_C$.
+
+    \item The parties invoke $\share{Q_1},...,\share{Q_{t'}}$ on $T$ to obtain shares $\share{T_{Q_i}}$ for $i\in [t']$. This should only require $O(N)$ AES calls using DPFs. These are input to MPC.
+
+    \item In MPC, $P'_i:=T_{Q_i}\in [N]$ for $i\in [t']$. Construct a distributed point function $\share{f_{P'_i, V_{C,i}}}$ and output these to the parties.
+
+    \item The parties expand $\share{f_{P'_i, V_{C,i}}}$ to obtain $\share{S_i}$. The final output is $\share{C}$ such that $C_{k_{j,d}} = S_{j,d}$.
+
+
+    \item If one assumes stationary LPN, we can perform $O(t')$ work to
+    \begin{enumerate}
+        \item update $V_A,V_B$ with new random values.
+        \item recompute $V_C$.
+        \item update $\share{f_{P'_i, V_{C,i}}}$.
+    \end{enumerate}
+    Then the DPFs can be re-expanded with $O(N)$ work. This step can be repeated as many times as you want.
+    
+\end{enumerate}
+
+
+
+\paragraph{$h_i$ distributions.} As described, $h_i$ of size $ct$. We need it to be a bit bigger than $t$ to make sure $H$ is invertible with decent Pr. Alternatively, we could to polynomial interpolation as Amit suggested. But this might not be as efficient to evaluate. 
+
+Also, we can probably make the $h_i$ sparse. Maybe $O(1)$ sparsity or something. This would mean $c$ can be decently big and invertibility shouldn't be an issue, probably.
+
+
+\paragraph{Leakage.} if the leakage of the scheme seems a bit too much, i.e. revealing $s$, then we could have $w$ different $s$ values. Each output position would then be the sum of $w$ DPF outputs. Maybe $w=2$ is reasonable enough given that cuckoo hashing with similar parameters work most of the time.
+
+\paragraph{Overheads} The main overhead of this scheme seems to be $2wt'$ DPF that are over a sparse domain. Random access wont be great bit likely still much faster than the polynomial compression function we performed next.
+
+

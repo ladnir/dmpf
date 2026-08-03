@@ -1,0 +1,77 @@
+\newif \ifcomments \commentstrue
+\newif \iffull \fulltrue
+
+\iffull
+\documentclass[11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[letterpaper,margin=1in,bmargin=1.5in]{geometry}
+\usepackage{amsthm}
+
+\else
+
+\documentclass[runningheads]{llncs}
+%
+\usepackage[T1]{fontenc}
+\fi
+\usepackage{amssymb}
+\usepackage{xparse}
+\usepackage{url}
+\input{preamble}
+
+
+\begin{document}
+\title{Fully Distributed Multi-Point Functions for PCGs and Beyond}
+\author{Amit Agarwal \and Srinivasan Raghuraman \and Peter Rindal}
+
+\maketitle 
+
+\input{abstract}
+\textcolor{red}{move to peter's github...}
+
+\input{intro}
+\input{prelim}
+\input{overview}
+
+\input{DPF}
+\input{DMPF}
+
+
+\input{Cuckoo}
+\input{RevCuckoo}
+\iffull
+\input{Bucketing}
+\input{BigState}
+\else
+\input{OtherSummary}
+\fi
+\input{pcg}
+\input{eval}
+
+
+\bibliographystyle{alpha}
+\bibliography{paper}
+\appendix
+
+\iffull
+\else
+
+{\LARGE \bf \verb+    + Supplementary Material}
+\section{Subroutines}
+\label{sec:subroutines}
+\input{subroutines}
+
+\input{Bucketing}
+\input{BigState}
+
+
+\section{Ring-LPN Overview}\label{sec:ringLpnOverview}
+\input{ringLpnOverview}
+
+\fi
+
+\iffull
+\paragraph{Disclaimer.} Case studies, comparisons, statistics, research and recommendations are provided ``AS IS" and intended for informational purposes only and should not be relied upon for operational, marketing, legal, technical, tax, financial or other advice. Visa Inc. neither makes any warranty or representation as to the completeness or accuracy of the information within this document, nor assumes any liability or responsibility that may result from reliance on such information. The Information contained herein is not intended as investment or legal advice, and readers are encouraged to seek the advice of a competent professional where such advice is required.
+
+These materials and best practice recommendations are provided for informational purposes only and should not be relied upon for marketing, legal, regulatory or other advice. Recommended marketing materials should be independently evaluated in light of your specific business needs and any applicable laws and regulations. Visa is not responsible for your use of the marketing materials, best practice recommendations, or other information, including errors of any kind, contained in this document.
+\fi
+\end{document}

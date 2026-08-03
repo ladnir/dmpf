@@ -1,0 +1,94 @@
+
+\section{Cuckoo Based DMPF}\label{sec:cuckoo}
+
+
+The cuckoo DMPF adapts classic \emph{cuckoo hashing} to split a $t$-point function into $m \approx (1 + \epsilon)t$ single-point sub-functions that we can implement with $m$ independent DPF instances. This use of cuckoo hashing can be viewed as a concrete instantiation of earlier combinatorial batch-code–based FSS/DMPF constructions \cite{fssBatchCodes}. The work of \cite{cuckooDmpf} develops a practical cuckoo-based instantiation in a setting where one party knows $A$, and \cite{dmpf} later describes the construction and optimizations explicitly in the DMPF framing. This is the first construction that in theory achieves our desired performance metrics and is closely related to our Reverse-Cuckoo construction. Therefore we review it here.
+
+Cuckoo hashing, introduced by Pagh and Rodler \cite{cuckoo}, is a $w$-choice open-address hash table that achieves worst-case $O(1)$ look-ups and deletions while retaining linear-space overhead. Because its probe pattern is deterministic once the hash keys are fixed, the scheme has become a standard primitive inside privacy-preserving protocols, e.g., PSI, PIR, ORAM, batch codes, see \cite{yeo2023cuckoo}.
+
+$t$ items $A_1,...,A_t\in [0,N)$ can be inserted into a hash table of size $m\approx (1+\epsilon)t$ bins such that there is at most one item in any bin and item $\alpha$ will reside at one of the bins indexed by the random functions $h_1(\alpha),...,h_w(\alpha)\in [m]$. For approiate choices of $m,w$ and taking $h$ has a random variable, one can successfully construct such a hash table with overwhelming probaiblity. Typical choices is to set $w=3$ and $m\approx1.3t$ or $w=2,m=2.4t$ \cite{demmler2018pir}. 
+\newcommand{\vbar}{\rule{0.1mm}{.2cm}}
+
+\begin{figure}[t]
+\centering
+\[
+\begin{array}{cccc}
+P =\begin{pmatrix}
+1 & 0 & \mathbf{1} & 0 \\
+1 & 0 & 0 &1 \\
+0 & \mathbf{1} & 1 & 0 \\
+0 & 1 & 0 & 1 \\
+1 & 0 & 1 & 0 \\
+0 & 1 & 0 & \mathbf{1} \\
+1 & 1 & 0 & 0 \\
+0 & 0 & 1 & 1 \\
+\end{pmatrix}\normalsize,
+&
+U =
+\begin{pmatrix}
+0 & 0 & \mathbf{1} & 0 \\
+0 & 0 & 0 & 0 \\
+0 & \mathbf{1} & 0 & 0 \\
+0 & 0 & 0 & 0 \\
+0 & 0 & 0 & 0 \\
+0 & 0 & 0 & \mathbf{1} \\
+0 & 0 & 0 & 0 \\
+0 & 0 & 0 & 0 \\
+\end{pmatrix}\normalsize,
+&
+D =
+\begin{pmatrix}
+0 & 0 & B_2 & 0 \\
+0 & 0 & 0 & 0 \\
+0 & B_1 & 0 & 0 \\
+0 & 0 & 0 & 0 \\
+0 & 0 & 0 & 0 \\
+0 & 0 & 0 & B_3 \\
+0 & 0 & 0 & 0 \\
+0 & 0 & 0 & 0 \\
+\end{pmatrix},
+&
+S =
+\begin{pmatrix}
+0 & \vbar & B_2 & \vbar \\
+0 & \vbar & \vbar & 0 \\
+\vbar & B_1 & 0 & \vbar \\
+\vbar & 0 & \vbar & 0 \\
+0 & \vbar & 0 & \vbar \\
+\vbar & 0 & \vbar & B_3 \\
+0 & 0 & \vbar & \vbar \\
+\vbar & \vbar & 0 & 0 \\
+\end{pmatrix}
+\end{array}
+\]
+\caption{
+Example cuckoo DMPF matrices for $N=8$, $t=3$, $m=4$, $w=2$. 
+$P$ is the position matrix; 
+$U$ is the induced unit-vector assignment; 
+$D$ is the expanded DMPF matrix; 
+$S$ shows the sparse column view (entries marked $\vbar$ can be ignored).
+}
+\label{fig:cuckoo-matrices}
+\end{figure}
+
+
+Consider an equivalent view where we have a matrix $P\in \{0,1\}^{[0,N)\times m}$ such that row $P_\alpha$ for $\alpha\in [0,N)$ has nonzeros at columns $h_1(\alpha),...,h_w(\alpha)$,  i.e. $P_{\alpha,h_j(\alpha)}=1$. We refer to $P$ as the position matrix as row $P_\alpha$ encodes the valid position for each $\alpha$. Constructing a cuckoo hash table can then be thought of as finding a unique column $c_i\in [m]$ for each $A_i\in\{A_1,...,A_t\}$ subject to $c_i\in \{h_1(A_i),...,h_w(A_i)\}$ or equaivalently $P_{A_i,c_i}=1$. For example, with $N=8, t=3,m=4,w=2$ and matrix $P$ in \figureref{fig:cuckoo-matrices}.
+If we choose $(A_1,A_2,A_3)=(3,1,6)$ then a valid assignment would be for $c=(2,3,4)$ which we make bold above. It is also possible for no valid asigment to exists, e.g. in the case above this would correspond the senario where $P_{A_1}=P_{A_2}=P_{A_3}$ but could in general be a more complicated conflict. However, parameters are chosen such that this is unlikely.
+
+Critically for us, the condition that each bin in a cuckoo hash table has one item is equivalent to there being at most one active position in each column of $P$. Switching our perspective we can observe the active position of each column forms a unit vector. That is, $U$ in \figureref{fig:cuckoo-matrices}.
+At this point is may be clear how to construct the DMPF. Given the input positions $A_1,...,A_t$ we construct a cuckoo hash table for the set $A\subseteq[0,N)$ and obtain the column/bin assignemnts $c_1,...,c_t$. We then construct $m$ distirbuted single point function for where the $c_i$'th point function has index $A_i$ and value $B_i$. In our example above the result would be $D$ in \figureref{fig:cuckoo-matrices}
+where each point function is expanded into the corresponding column. The final multi point function is obtained by summing the columns, e.g. the column vector $(B_2,0,B_1,0,0,B_3,0,0)$ in our example.
+
+
+However, it may not be appearent that this approach is any better than simply construct $t$ points function instead of $m$. The critical observation is that is it publicly known which position of each column that can have values. For example, column 1 may only have a values at rows $0,1,5,7$. Taking advantage of this sparsity we obtain $S$ in \figureref{fig:cuckoo-matrices}
+where position with $\vbar$ can be ignored. The point function for the $i$th column can then be over a smaller range only consisting of the valid subset of positions. Overall, this reduces the number of possible points to $wN=O(N)$ and thereby reduce the overall amount of work.
+
+\paragraph{Address Translation.} The prior work of \cite{dmpf} suggested the use of a standard DPF for each column. However, this introduces a challenge in that the position $A_i\in [0,N)$ is not the correct position in the compressed column. For example, $A_1=3$ in the global address space $[0,N)$ but is in the first position of the compressed column $(B_1,0,0,0)$. The parties therefore must translate the existing address $A_i$ into a new address $A_i'=\sum_{j\in[0,A_i)}P_{c_i,j}$. However, computing the new address using this formula can not be acheived succinctly.   \cite{dmpf} suggested a clever workaround by defining a permutation $\pi : [w]\times [0,N) \rightarrow [m]\times[0,f)$ where $f:=wN/m$ and we assume $m$ divides $wN$. The hash functions are then defined as $(h_j(A_i),A'_{i,j}):=\pi(j,A_i)$ which outputs the hash value $h_j(A_i)$ as well as the translated address $A'_{i,j}$ if $A_i$ is placed in column $c_i=h_j(A_i)$. The correctness of this idea follows from $\pi$ being a random permutation. In addition, each single point function now has exactly size $f$. 
+
+Although this approach works, it requires implementing a (pseudorandom) permutation within MPC. The natural choice would be to use a feistel construction but this requires many iterations of the feistel round function which complicates the implementation. 
+
+\paragraph{Sparse DPF.} A natural application of our new sparse DPF is to directly implement the point function over the sparse columns. This approach completely eliminates the whole need to implement $\pi$ within MPC and instead the hash functions can be implemented using simple techniques, e.g. as linear functions. 
+
+\paragraph{Iterative Insertion.} Up to this point we have ignored the question of how to choose the column $c_i\in\{h_1(A_i),...,h_w(A_i)\}$ that the pair $(A_i,B_i)$ will be mapped to. Moreover, note that this must be performed within MPC as the $A_i,B_i$ values will be seceret shared. In the plaintext setting the standard approach is to iteratively construct the set $c$ which is initially empty. Starting with $A_1$, we arbitrarily choose $c_1\in\{h_1(A_1),...,h_w(A_1)\}$. For $A_i\in \{A_2,...,A_t\}$, we again choose some $c_i\in\{h_1(A_i),...,h_w(A_i)\}$. If the value of $c_i$ is already being used by come $c_j$, then we ``evict'' $A_j$ from column $c_i$ and place $A_i$ there instead. We then reinsert $A_j$ using some other hash function value and continue this eviction processes until all items are inserted or some threshold of attempts are made, at which point the insert abort. 
+
+To perform this process in MPC is presumably highly expensive. We considered several variants  such as inserting many items in parallel but were unable to derive a satisfactory solution. Because of this we omit a formal protocol description of this approach.

@@ -1,0 +1,89 @@
+\section{Application to PCGs: Ring-LPN and Stationary LPN}\label{sec:ringlpn}
+
+\paragraph{PCGs in a nutshell.}
+A pseudorandom correlation generator (PCG) for a target two-party correlation $\mathcal C$ consists of a short-seed setup $\PCG.\Gen(1^\lambda)\to(k_0,k_1)$ and a silent expansion algorithm $\PCG.\Expand(\sigma,k_\sigma)\to R_\sigma$ whose outputs jointly emulate a sample from $\mathcal C$, even to an insider who knows one of the seeds. Formally, correctness and insider security are captured in \cite[Def.~2.6]{boyle2020efficient}, together with the reverse-sampleability notion of \cite[Def.~2.5]{boyle2020efficient}. PCGs enable a tiny, one-time interactive setup followed by a bounded, communication-free expansion of $k_i$ into $n$ correlations. We also consider Stationary LPN, which allows for an even smaller ``key refresh'' protocol that lets the parties generate another set of $n$ correlations (see below). We will not explicitly define $\PCG.\Gen$; instead, we describe the monolithic protocol that allows the two parties to interactively compute $\PCG.\Gen$. However, one can recast our protocol in this syntax if desired.
+
+
+
+
+
+\iffull
+
+\input{ringLpnOverview}
+
+
+\else
+\paragraph{Ring-LPN PCGs.}
+Ring-LPN based \emph{silent} PCGs \cite{boyle2020efficient} and variants ~\cite{pcgQASD,foleage,anyField,pcgZ2k} work over a degree-$N$ ring $\mathbb{R}=\mathbb{F}_q[X]/(X^N+1)$ and use sparse noise
+polynomials to derive many correlations at once. Concretely, each party samples sparse ring elements and a fresh ring mask
+$r\leftarrow \mathbb{R}$, forms a masked ring value $x'_p=e_{p,0}+r\cdot e_{p,1}$, and applies an NTT to obtain
+$x_p=\mathsf{NTT}(x'_p)\in \mathbb{F}_q^N$. The goal of the PCG is to produce an additive sharing of the ring product
+$y'=x'_0\cdot x'_1$, which then maps locally to a packed OLE / triples relation $y=x_0\odot x_1$
+after applying $\mathsf{NTT}$. Full details and notation are given in \sectionref{subsec:ringlpn}.%
+
+\paragraph{Stationary LPN / SSD.}
+Stationary LPN (SSD) \cite{Stationary} is the regime where the \emph{supports} of the sparse noises are fixed across many expansions, while the
+\emph{coefficients} refresh each time. In the Ring-LPN PCG flow, this means the address patterns induced by the sparse products
+are fixed once, and subsequent expansions differ only in the payload values and the fresh ring masks. This enables an
+``offline/online'' split: perform all position-dependent preprocessing once, then, in each expansion, only inject new coefficients
+and run ring/NTT arithmetic. We defer the formal statement and the amortization details to
+
+\sectionref{sec:stationary}.%
+
+\fi
+
+
+
+
+\subsection{Impact on Related PCG Constructions}\label{sec:impact}
+
+While our presentation above focused on the Ring-LPN and Stationary LPN settings,
+the same structural improvements offered by our DMPF constructions extend naturally
+to recent works on PCGs over Boolean circuits, arbitrary finite fields, and Galois rings.
+We briefly summarize these connections.
+
+\paragraph{PCGs for Boolean and multi-party circuits.}
+Bombar et al.\ introduce FOLEAGE \cite{foleage}, a PCG-based framework for
+efficient Boolean MPC using $F_4$-OLEs. Their protocol relies on a
+programmable PCG to stretch seeds into large families of correlations, but it
+still requires recomputation of routing structure for each instance.
+Our DMPF path allows one to factor out this recomputation: the support
+positions (determined by $F_4$ embeddings and syndrome-decoding gadgets) can
+be cached, leaving only lightweight value injection per expansion. This aligns
+perfectly with the semi-honest, many-expansion setting FOLEAGE targets, and it
+suggests further speedups in the multi-party case where $O(N^2)$ blowups are
+otherwise incurred.
+
+\paragraph{PCGs over any finite field.}
+Li et al.\ \cite{anyField} propose PCGs for OLEs and authenticated
+multiplication triples over arbitrary fields, using trace functions to lift the
+Ring-LPN/QA-SD paradigm \cite{pcgQASD} into the binary case $F_2$. Ring-LPN, as
+described above, requires $\mathbb F_q$ where $q>n$ and therefore does not work
+for small fields. Their approach is programmable, and therefore already admits
+multi-party generalizations, but the per-expansion overhead remains dominated
+by reconstructing sparse cross-term supports. Substituting our DMPF-based
+support handling yields the same benefit as above: once the support routing is
+precomputed, subsequent expansions reduce to coefficient injection and
+NTT-backed arithmetic. This brings the ``any field'' PCG line into the same
+optimized regime as our Ring-LPN/Stationary pipeline.
+
+\paragraph{PCGs over Galois rings.}
+Li et al.\ \cite{pcgZ2k} present programmable PCGs for OLE and SPDZ${}_{2^k}$ triples
+over arbitrary Galois rings, leveraging Hensel lifting and Galois theory.
+Their protocols inherit a key cost driver: repeatedly routing sparse product
+supports into a structured ring domain. Our DMPF constructions provide a
+direct plug-in replacement for this routing layer. Instead of rebuilding the
+support structure for each expansion, one can precompute the DMPF routing once
+(per support) and reuse it across expansions—precisely the benefit described
+in Section~\ref{sec:stationary}. This cuts the online cost down to payload
+injection and ring arithmetic, thereby improving both the asymptotics and the
+concrete constants of their $Z_{2^k}$-based PCGs.
+
+\paragraph{Takeaway.}
+In all three settings—Boolean circuits, arbitrary fields, and Galois rings—the new
+DMPF constructions eliminate repeated position-routing costs. This unifies
+the efficiency gains: the heavy, $N$-dependent cryptographic work is moved
+to a one-time setup, while each expansion costs only value injection plus
+local algebra. Thus, our ideas are broadly applicable and yield concrete
+improvements across the state-of-the-art PCG landscape.
+cape.

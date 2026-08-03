@@ -1,0 +1,192 @@
+
+\section{Reverse Cuckoo DMPF}\label{sec:revCuckoo}
+
+We solve the challenges of the cuckoo construction by completely eliminating the need to construct a cuckoo hash table $c$ using the interative method. Instead, we first choose a random cuckoo hash table $c$ and then to solve for consistent hash function $h_1,...,h_w$.
+
+\paragraph{Overview} We will assume the reader is familiar with \sectionref{sec:cuckoo}. The core idea of our construction is as follows.
+
+\begin{itemize}
+    \item The idea is that we will first pad $\share{A},\share{B}$ to each be length $m$ with dummy values and then permute the list in a random order. The positions that each real item lands in will be the cuckoo position that each point belongs to. That is, $c_i=\pi(i)$ where $\pi$ is the random permutation. Let $\share{A'},\share{B'}$ now denote the permuted points.
+
+    \item Our next goal is to construct hash function $h_1,...,h_w$ such that for some $j\in [w]$ it holds that $h_j(A_i)=c_i$ without revealing anything about the actual value of $A_i$.
+
+    \item We then reinterpret each index $\share{A_i}$ as a binary vector in $\{0,1\}^{\log N}$ and partition $\share{A'}$ into $w$ region denoted as $\share{M_1},...,\share{M_w}\in \{0,1\}^{d\times \log N}$ where 
+    $$
+        \share{M_i}=\begin{bmatrix}
+        \share{A'_{g+1}}\\
+        ...\\
+        \share{A'_{g+d}}
+    \end{bmatrix}
+    $$
+    for $g:=(i-1)d$ and $d:=m/w$.
+
+    \item The core idea will then be to construct a \emph{linear} ``hash function'' which maps $A'_i$ to its assigned position $i$. In particular, we want some vector $h$ such that $\langle h, A'_i\rangle =i$. More speficially, we want $w$ vectors $h_1,...,h_w$ where  for each $A'_i$ and some random $j$ it holds that $h_j(A'_i)=i$. 
+    
+    Since the $A'_i$s are in a random order, we can simply mandate that the first $d$ values will use $h_1$, the second $d$ values use $h_2$ and so on. Let us focus on $h_1$. The desired condition is simply
+    $$
+        \share{M_1}\cdot \share{h_1'}=\begin{bmatrix}
+            1&
+            2&
+            ...&
+            d           
+        \end{bmatrix}^T
+    $$
+    We will choose a random $h_1$ which satisfies this. Moreover, we can perform all of this modulo $d$ and therefore all other $h_i$ can be derived using the same structure. Overall we obtain that
+    $$
+        \langle \share{A_i'}, \share{h_{\lfloor i/d\rfloor}}  \rangle= i \mod d  
+    $$
+    The $\mod d$ can then be manually offset. That is, some index $\alpha \in \{0,1\}^{\log N}$ is hashed to positions
+    $$
+        h_j'(\alpha) := (\langle \alpha, h_j \rangle \mod d) + 1 + (j-1)d
+    $
+
+    \item Once the $\share{h_j}$ values are solved for, the parties can reveal them and use $h_j'$ to define the position matrix $P$. The rest of the protocol can the proceed as described before with the use of the Sparse DPF protocol for each column of $P$.
+\end{itemize}
+
+In summary, the parties first obliviously assign the $t$ input points to $m=(1+\epsilon)t$ positions. The parties then solve a set of $w$ linear systems to derive the hash function $h_1',...,h_{w}'$ which in turn defines the prosition matrix $P$ which can be used in conjection with the sparse DPF to complete the protocol. The full protocol is described in \figureref{fig:revCuckoo}.
+
+\paragraph{Invertibility.} The description above assume that the system of equations $M_i$ is invertable. However, it is possible to choose a set of inputs $A_1,...,A_t$ for which their bit decomposition is not invertable. To address this issue we opt to first hash each index using some appropriately chosen hash function $H :\{0,1\}^{\log N}\rightarrow\{0,1\}^q$ where $q$ is sufficiently large that over the random choices of $H$ the resulting system is invertibable with overwhelming probaiblity, e.g. $q\geq d+\lambda$ for statistical security parameter $\lambda$. In \sectionref{sec:hash} we give a concrete suggestion for $H$.
+
+\paragraph{Duplication.} Another complexity is that it is possible to have duplicate input indices $A_i=A_j$. In this case the ideal functionality will output $B_i+B_j$ at index $A_i$. However, the protocol as described only works for distinct $A_i$. Therefore we introduce a deduplication step at the start of the protocol which is explained in more detail in \sectionref{sec:dedup}.
+
+Next we will present the neccessary subprotocols before a formal description and proof of security.
+
+
+
+\newcommand{\domain}{\left[0,N\right)}
+\begin{figure}[ht]\small
+	\centering
+	\fbox{ \begin{minipage}{.95\textwidth}
+    
+     $\textsf{RevCuckoo}(\share{A}\in (\{0,1\}^{\log N})^t,\share{B}\in \mathbb{G}^t)$, party $p\in \{0,1\}$ computes:
+    
+\begin{enumerate}
+
+    \item suggested parameters $w=2, d=2^{\lceil\log_2 t\rceil}, m=dw, q= d+\lambda$.
+    
+    \item  $(\share{A}, \share{B}):= \dedup(\share{A},\share{B}, (N)_{i\in[t]})$.
+    \item Define hash functions $H_1,...,H_w:[0,N] \rightarrow \mathbb{Z}_{2}^{q}$ s.t. $H_i(N)=0$.
+    \item $\share{A}:=\share{A} || (N)_{i\in [m-t]}$.
+    \item $\share{B}:= \share{B} || (0)_{i\in[m-t]}$.
+    \item $(\share{A} \uzip \share{B}):=\mathsf{shuffle}(\share{A}\zip \share{B})$. 
+    \item Let $\share{M_i}=\begin{bmatrix}
+        H_i(\share{A_{g+1}})\\
+        ...\\
+        H_i(\share{A_{g+d}})
+    \end{bmatrix}$ for $i\in[w]$ and $g:=(i-1)d$.
+    \item For $i\in[w]$,  $\share{h_i}:=\textsf{bin-solver}(\share{M_i}, \share{y_i})$ where  
+    $
+        y_i:= \begin{bmatrix}
+            0\\
+            1\\
+            ...\\
+            d-1\\            
+        \end{bmatrix}
+    $
+    \item $h:=\textsf{reveal}(\share{h})$.
+    \item For $i\in [0,N),j\in[w],$ the parties compute $s_{i,j}:=\langle H_j(i), h_j\rangle$
+    \item Define $P\in \{0,1\}^{[0,N),m}$ s.t. $P_{i,(j-1)d + s_{i,j}}=1$ for $i\in \domain,j\in[w]$.
+    \item For $j\in[m]$, let $S_j:=\{i \mid P_{i,j}=1\}$
+
+    \item For $j\in [m]$, the parties invoke $\textsf{sparse-DPF}(\share{A}_j,\share{B}_j, S_j)$ and receive as output $\share{y'_j}$.
+    \item For $i\in \domain$, let $\share{y_i}:=0$
+    \item For $j\in[m],(i,\share{u})\in (S_j\zip \share{y_j})$, let $\share{y_i}:= \share{y_i}+\share{u}$.
+
+    \item output $\share{y}$
+
+    \item If one assumes stationary LPN, we can perform $O(t')$ work to update \textsf{sparse-DPF} with new leaf values.
+    Then the DPFs can be re-expanded with $O(N)$ work. This step can be repeated as many times as you want.
+    
+\end{enumerate}
+    \end{minipage}}
+\caption{Reverse-Cuckoo Distributed multi-point function realizing \figureref{fig:dmpfFunc}.\label{fig:revCuckoo}
+} 
+\end{figure}
+
+
+\paragraph{Proof Sketch (semi-honest).}
+We show that the view of either party in the real protocol is simulatable given only public parameters except with negligible probability.
+
+\emph{Simulator.} On input public params \((N,m,w,\ldots)\):
+\begin{enumerate}
+  \item Sample \(h_1,\ldots,h_w \leftarrow \{0,1\}^{q}\) independently and uniformly, and form the public hash family \(h'_\ell(x) := (\langle H_\ell(x), h_\ell\rangle ) + 1 + (\ell{-}1)d\) and the induced position map \(P\).
+  \item With probability equal to the cuckoo failure probability (negligible in \(\lambda\) for the chosen load), output \(\mathsf{abort}\) and halt. Otherwise continue.
+  \item Simulate the MPC transcripts of \textsf{dedup}, \textsf{bin-solver}, and the local computations by sampling random messages consistent with (i) the public sizes and (ii) the final revealed \(h_\ell\). For sparse-DPF subinstances, output random keys that are distributed as real DPF keys (by the PRG/DPF security) and do not require knowledge of the hidden indices/values.
+\end{enumerate}
+
+\noindent \emph{Indistinguishability argument.}\\
+
+(1) \textbf{Distribution of the revealed hash descriptors \(\boldsymbol{h_i}\).}
+In the real protocol (Fig.~\ref{fig:revCuckoo}, Steps 7-9), each block \(i\in[w]\) forms
+\[
+  M_i \;=\;
+  \begin{bmatrix}
+    H_i(A_{g+1})\\[-2pt]\vdots\\[-2pt] H_i(A_{g+d})
+  \end{bmatrix}
+  \in \{0,1\}^{d\times q},
+  \qquad
+  y_i \;=\; (0,1,\ldots,d{-}1)^\top,
+  \quad g=(i{-}1)d,
+\]
+and runs \(\textsf{bin-solver}(M_i,y_i)\) to obtain a secret-shared solution \(\share{h_i}\in\{0,1\}^q\), which is then revealed as \(h_i\).
+By construction, conditioned on \(\mathrm{rank}(M_i)=d\) (which holds except with probability \(\le 2^{-(q-d)}\) by our choice \(q=d+\lambda\); see \S\ref{sec:hash}), the solution set
+\(\{h\in\{0,1\}^q : M_i h = y_i\}\) is an affine subspace of dimension \(q{-}d\), and our randomized solver outputs \(h_i\) \emph{uniformly} over that subspace.
+Since neither the rows \(H_i(A_{g+u})\) (i.e., \(M_i\)) nor anything about the \(A\)’s is revealed, the adversary only sees the published \(h_i\) with the public sizes \((d,q)\).
+Thus, from either party’s view, each \(h_i\) is distributed as a random element of a hidden affine coset determined by the (unrevealed) \(M_i\) and public \(y_i\).
+In the simulator, we therefore sample \(h_i \leftarrow \{0,1\}^q\) uniformly and proceed, since the induced public uses of \(h_i\) are only through Steps 10-12:
+\[
+  s_{j,i'} \;=\; \langle H_j(i'),\, h_j\rangle,
+  \qquad
+  P_{i',(j-1)d + s_{j,i'}}=1,
+\]
+which depend on \(h_i\) but not on the hidden \(M_i\); any distinguishing advantage would imply learning linear relations about the secret \(A\)’s from \(h_i\) alone, contradicting that \(M_i\) (hence the defining coset) is never revealed.
+
+(2) \textbf{Cuckoo validity / abort.} For the revealed hash family \(h'_\ell\), the existence of a valid placement of the \(t\) items into \(m=(1{+}\varepsilon)t\) bins using \(w\) choices per item fails with negligible probability under standard cuckoo analysis. The real protocol only proceeds when a valid assignment exists (our construction fixes a permutation and solves for consistent \(h'\)); the simulator mirrors this by aborting with exactly the same negligible probability, so the abort bit is perfectly coupled.
+
+(3) \textbf{Transcript simulation.} The \textsf{dedup} and \textsf{bin-solver} subprotocols are linear/boolean MPC over secret shares; they reveal no additional outputs beyond \(s_\ell\). Standard straight-line simulators for OT/garbled MPC can therefore produce transcripts indistinguishable from real, given \(s_\ell\) and sizes. For each sparse-DPF, key indistinguishability of the underlying DPF (against a party who sees only its own key) lets us sample keys without the hidden \((A'_j,B'_j)\). Since the public position map \(P\) is a function of the revealed \(s_\ell\) only, no additional information about the inputs is leaked.
+
+(4) \textbf{Correctness (brief).} When \(M_\ell\) are full rank, each block produces hash parameters \(s_\ell\) that send every \(A'_i\) to its designated bin; the sparse-DPFs routed by \(P\) then sum to \(y=\sum_i \unitVec_{[0,N)}(A_i,B_i)\). Padding and \textsf{dedup} ensure uniqueness and proper summation under collisions.
+
+The simulated view is indistinguishable from the real view; any difference occurs only in the negligible cuckoo-failure event, which is identically reflected by the simulator's abort. In particular, this is the standard semi-honest simulation model with abort: the ideal functionality is allowed to output $\bot$ with negligible probability, and the simulator must match the abort distribution. The only leakage beyond the DMPF output is this abort bit, which is identical to the leakage present in cuckoo-hashing-based protocols (e.g., PSI) where failure corresponds to the nonexistence of a valid placement under the public hash functions.
+
+
+
+\iffull
+
+\input{subroutines}
+\else
+% ---------------------------------------------------------------------------
+% Reverse Cuckoo subprotocols (brief, main-text summary)
+% ---------------------------------------------------------------------------
+\paragraph{Reverse Cuckoo subprotocols.}
+Our Reverse Cuckoo DMPF relies on three standard MPC subroutines, a binary linear system
+solver, a deduplication pass for colliding indices, and a lightweight hashing layer used only to
+ensure the system is full rank.
+These components are not strictly novel; the contribution is a careful implementation and integration
+that yields an efficient setup.
+
+\emph{System solver (bin-solver).}
+Given secret-shared inputs $\share{M} \in \F_2^{m \times c}$ and $\share{y} \in G^m$ for a characteristic-$2$ group $G$,
+the bin-solver outputs a secret-shared solution $\share{x} \in G^c$ such that $Mx=y$ (when solvable),
+and samples a uniformly random solution within the affine solution space by randomizing free
+variables and performing back-substitution. The protocol is based on standard elimination-style
+row operations performed in MPC, and requires $O(mc+mc\log |G|)$ bits of communication. See \sectionref{sec:solver} for details.
+
+\emph{Deduplication.}
+Before solving, we remove duplicate keys among the $t$ secret-shared indices: for each key value,
+the first occurrence accumulates the sum of payloads and subsequent duplicates are rewritten to a
+public dummy key with zero payload. This ensures correctness under collisions while keeping the
+subsequent placement and solving logic well-defined. The protocol uses standard MPC equality
+tests and conditional moves.  See \sectionref{sec:dedup} for details.
+
+\emph{Hashing layer.}
+The hashing layer is seeded and block-local and is used only to ensure that, after shuffling, each
+block matrix $M_i$ formed from hashed rows has full row rank over $\F_2$ with overwhelming
+probability. We do not
+require cryptographic properties such as collision resistance; we require post-hoc algebraic
+genericity under fresh seeds sampled independently of the inputs. Our implementation uses an
+Goldrich PRG styled construction that is linear except for a small number of bitwise multiplications.  See \sectionref{sec:hash} for details.
+
+
+
+\fi

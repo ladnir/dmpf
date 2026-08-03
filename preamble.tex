@@ -1,0 +1,398 @@
+%!TEX root = ../main.tex
+%!TEX root = ../main.tex
+
+%--------------------------------------------------------------%
+%-----------------------Common Packages------------------------%
+%--------------------------------------------------------------%
+\usepackage{amsmath,dashrule}
+\usepackage{xspace}
+\usepackage[dvipsnames]{xcolor}
+\usepackage{amsfonts,amsmath}
+\usepackage{enumitem}
+\usepackage{tikz,forest}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage[pdfauthor={},pdfpagelabels=true,linktocpage=true,hidelinks,linktoc=all,colorlinks]{hyperref}
+\usepackage[nameinlink,capitalize]{cleveref}
+\iffull 
+\else 
+\fi
+    \usepackage{cite}
+    \usepackage[square,comma,numbers,sort&compress]{natbib} 
+\hypersetup{linkcolor = {black}, citecolor = {magenta}, urlcolor = {black}}
+\usepackage{booktabs}
+
+
+\usepackage{float}
+\usepackage{newfloat}
+\DeclareFloatingEnvironment[
+    fileext=los,
+    listname=List of Constructions,
+    name=Construction,
+    placement=t!,
+    within=section,
+]{scheme}
+\usepackage{adjustbox}
+\usepackage{blindtext}
+
+\usepackage{multirow}
+\usepackage{algorithmicx, algorithm, algpseudocode}
+
+
+\newcommand{\protbox}[1]{\fbox{\small\hbox{\quad\begin{minipage}{\textwidth}\smallskip#1\end{minipage}\quad}}}
+\newcommand{\protboxwithtitle}[2]{\fbox{\small\hbox{\quad\begin{minipage}{\textwidth}\begin{center}{\bf #1}\end{center}#2\end{minipage}\quad}}}
+
+% \ifproceedings
+% \newcommand{\appref}[1]{the full version}
+% \else
+% \newcommand{\appref}[1]{\cref{#1}}
+% \fi
+
+%--------------------------------------------------------------%
+%---------------------------Notation---------------------------%
+%--------------------------------------------------------------%
+
+% Standard math notation
+\newcommand{\N}{\mathbb{N}}     % Natural numbers
+\newcommand{\Z}{\mathbb{Z}}     % Integers
+\newcommand{\F}{\mathbb{F}}     % Finite field
+\newcommand{\Group}{\mathbb{G}} % Group
+
+\newcommand{\GO}{\ensuremath{\ast}\xspace} % Group operation
+\newcommand{\GE}[1]{\ensuremath{\overline{#1}}} % Group element
+
+\newcommand{\R}{R}     % changed to R in PCG notation
+
+\newcommand{\Bern}{\mathsf{Bernoulli}}
+
+\newcommand{\ceil}[1]{\left\lceil {#1} \right\rceil}
+\newcommand{\floor}[1]{\left\lfloor {#1} \right\rfloor}
+\newcommand{\abs}[1]{\left| {#1} \right|}
+\renewcommand{\vec}[1]{\ensuremath{\mathbf{#1}}\xspace}             %Vector
+\newcommand{\mat}[1]{\ensuremath{\mathbf{#1}}\xspace}               % Matrix
+\newcommand{\matind}[3]{\ensuremath{\mathbf{#1}|_{{#2}, {#3}}}\xspace} % Matrix indexing
+
+%% String operations
+\newcommand{\wt}[1]{\ensuremath{\mathsf{HW}({#1})}\xspace}  % Hamming weight
+\newcommand{\rhw}{\ensuremath{\mathsf{RW}}\xspace}  % Relative hamming weight
+\newcommand{\im}[1]{\ensuremath{\mathsf{Im}({#1})}\xspace}
+\newcommand{\lsb}{\ensuremath{\mathsf{LSB}\xspace}}         % Least Significant bit (LSB)
+\newcommand{\msbs}{\ensuremath{\mathsf{MSBs}\xspace}}         % Most Significant bits (MSBs)
+
+
+\newcommand{\zip}{\mathbin{\triangleright\mspace{-3mu}\triangleleft}}
+\newcommand{\uzip}{\ensuremath{\mspace{-1mu}\triangleleft \mspace{-3mu}  \triangleright}}
+
+\newcommand{\share}[1]{\ensuremath{[\hspace{-1.5px}[#1]\hspace{-1.5px}]}\xspace}
+
+%--------------------------------------------------------------%
+%-----------------------LaTeX Formatting-----------------------%
+%--------------------------------------------------------------%
+% Comments
+\ifcomments
+    \newcommand{\amit}[1]{\textsf{\color{red}{[Amit: {#1}]}}}
+    \newcommand{\peter}[1]{\textsf{\color{teal}{[Peter: {#1}]}}}
+    \newcommand{\dakshita}[1]{\textsf{\color{purple}{[Dakshita: {#1}]}}}
+    \newcommand{\srini}[1]{\textsf{\color{blue}{[Srini: {#1}]}}}
+    \newcommand{\navid}[1]{\textsf{\color{ForestGreen}{[Navid: {#1}]}}}
+    \newcommand{\suvradip}[1]{\textsf{\color{blue}{[Suvradip: {#1}]}}}
+    \newcommand{\TODO}[1]{\textsf{\color{orange}{[TODO: {#1}]}}}
+    \newcommand{\future}[1]{\textsf{\color{brown}{[Future work: {#1}]}}}
+\else
+    \newcommand{\amit}[1]{}
+    \newcommand{\mahimna}[1]{}
+    \newcommand{\yiping}[1]{}
+    \newcommand{\elette}[1]{}
+    \newcommand{\yuval}[1]{}
+    \newcommand{\TODO}[1]{}
+    \newcommand{\future}[1]{}
+\fi
+
+\iffull
+% Environments
+    \newtheorem{theorem}{Theorem}[section]
+    \newtheorem{corollary}[theorem]{Corollary}
+    \newtheorem{conjecture}{Conjecture}[section]
+    \newtheorem{lemma}[theorem]{Lemma}
+    \newtheorem{proposition}[theorem]{Proposition}
+    \newtheorem{definition}[theorem]{Definition}
+    \newtheorem*{claim}{Claim}
+    \newtheorem{remark}[theorem]{Remark}
+
+    \theoremstyle{definition}
+    \newtheorem{example}[theorem]{Example}
+\else
+    %\newtheorem{construction}{Construction}[theorem]
+\fi
+
+
+\iffull \else 
+\fi
+
+% Subsection
+\setcounter{secnumdepth}{3}
+\makeatletter
+\renewcommand\subsubsection{\@startsection{subsubsection}{3}{0mm}{-0.5\baselineskip}{0.5\baselineskip}{\normalfont\normalsize\bfseries}}
+\makeatother
+
+% Patch definition 
+\let\definition\relax
+%\spnewtheorem{definition}{Definition}{\bfseries}{}
+
+% Patch greek symbols
+\DeclareMathSymbol{\Gamma}{\mathalpha}{operators}{0}
+\DeclareMathSymbol{\Delta}{\mathalpha}{operators}{1}
+\DeclareMathSymbol{\Theta}{\mathalpha}{operators}{2}
+\DeclareMathSymbol{\Lambda}{\mathalpha}{operators}{3}
+\DeclareMathSymbol{\Xi}{\mathalpha}{operators}{4}
+\DeclareMathSymbol{\Pi}{\mathalpha}{operators}{5}
+\DeclareMathSymbol{\Sigma}{\mathalpha}{operators}{6}
+\DeclareMathSymbol{\Upsilon}{\mathalpha}{operators}{7}
+\DeclareMathSymbol{\Phi}{\mathalpha}{operators}{8}
+\DeclareMathSymbol{\Psi}{\mathalpha}{operators}{9}
+\DeclareMathSymbol{\Omega}{\mathalpha}{operators}{10}
+
+
+\setitemize{topsep=0pt,itemsep=0pt,}
+
+\iffull \else
+\renewcommand{\paragraph}[1]{\smallskip\noindent\textbf{#1}}
+ \fi
+
+% LNCS defines \subparagraph; avoid deep heading nesting (can trigger TeX grouping overflow)
+\iffull \else
+\renewcommand{\subparagraph}[1]{\smallskip\noindent\textbf{#1}}
+\fi
+
+
+
+%% Crypto parameters
+\def\alice{\ensuremath{\mathtt{Alice}}\xspace}
+\def\bob{\ensuremath{\mathtt{Bob}}\xspace}
+\def\eve{\ensuremath{\mathtt{Eve}}\xspace}
+\def\partya{\ensuremath{\mathsf{P}_A}\xspace}
+\def\partyb{\ensuremath{\mathsf{P}_B}\xspace}
+\def\poly{\ensuremath{\mathsf{poly}}\xspace}
+\def\negl{\ensuremath{\mathsf{negl}}\xspace}
+\newcommand{\secpar}{\ensuremath{{\kappa}} \xspace}     % Statistical security param
+\newcommand{\secp}{\ensuremath{{\lambda}}\xspace}       % Computational security param
+
+
+
+ %% Cal Alphafabets
+  \newcommand{\cA}{\ensuremath{{\mathcal A}}\xspace}
+  \newcommand{\cB}{\ensuremath{{\mathcal B}}\xspace}
+  \newcommand{\cC}{\ensuremath{{\mathcal C}}\xspace}
+  \newcommand{\cD}{\ensuremath{{\mathcal D}}\xspace}
+  \newcommand{\cE}{\ensuremath{{\mathcal E}}\xspace}
+  \newcommand{\cF}{\ensuremath{{\mathcal F}}\xspace}
+  \newcommand{\cG}{\ensuremath{{\mathcal G}}\xspace}
+  \newcommand{\cH}{\ensuremath{{\mathcal H}}\xspace}
+  \newcommand{\cL}{\ensuremath{{\mathcal L}}\xspace}
+  \newcommand{\cM}{\ensuremath{{\mathcal M}}\xspace}
+  \newcommand{\cN}{\ensuremath{{\mathcal N}}\xspace}
+  \newcommand{\cO}{\ensuremath{{\mathcal O}}\xspace}
+  \newcommand{\cQ}{\ensuremath{{\mathcal Q}}\xspace}
+  \newcommand{\cR}{\ensuremath{{\mathcal R}}\xspace}
+  \newcommand{\cS}{\ensuremath{{\mathcal S}}\xspace}
+  \newcommand{\cT}{\ensuremath{{\mathcal T}}\xspace}
+  \newcommand{\cU}{\ensuremath{{\mathcal U}}\xspace}
+  \newcommand{\cV}{\ensuremath{{\mathcal V}}\xspace}
+  \newcommand{\cW}{\ensuremath{{\mathcal W}}\xspace}
+  \newcommand{\cX}{\ensuremath{{\mathcal X}}\xspace}
+  \newcommand{\cY}{\ensuremath{{\mathcal Y}}\xspace}
+  \newcommand{\cZ}{\ensuremath{{\mathcal Z}}\xspace}
+
+  %% SF Alphafabets
+  \newcommand{\sA}{\ensuremath{{\mathsf A}}\xspace}
+  \newcommand{\sB}{\ensuremath{{\mathsf B}}\xspace}
+  \newcommand{\sC}{\ensuremath{{\mathsf C}}\xspace}
+  \newcommand{\sD}{\ensuremath{{\mathsf D}}\xspace}
+  \newcommand{\sE}{\ensuremath{{\mathsf E}}\xspace}
+  \newcommand{\sF}{\ensuremath{{\mathsf F}}\xspace}
+  \newcommand{\sG}{\ensuremath{{\mathsf G}}\xspace}
+  \newcommand{\sH}{\ensuremath{{\mathsf H}}\xspace}
+  \newcommand{\sL}{\ensuremath{{\mathsf L}}\xspace}
+  \newcommand{\sM}{\ensuremath{{\mathsf M}}\xspace}
+  \newcommand{\sN}{\ensuremath{{\mathsf N}}\xspace}
+  \newcommand{\sO}{\ensuremath{{\mathsf O}}\xspace}
+  \newcommand{\sP}{\ensuremath{{\mathsf P}}\xspace}
+  \newcommand{\sQ}{\ensuremath{{\mathsf Q}}\xspace}
+  \newcommand{\sR}{\ensuremath{{\mathsf R}}\xspace}
+  \newcommand{\sS}{\ensuremath{{\mathsf S}}\xspace}
+  \newcommand{\sT}{\ensuremath{{\mathsf T}}\xspace}
+  \newcommand{\sU}{\ensuremath{{\mathsf U}}\xspace}
+  \newcommand{\sV}{\ensuremath{{\mathsf V}}\xspace}
+  \newcommand{\sW}{\ensuremath{{\mathsf W}}\xspace}
+  \newcommand{\sX}{\ensuremath{{\mathsf X}}\xspace}
+  \newcommand{\sY}{\ensuremath{{\mathsf Y}}\xspace}
+  \newcommand{\sZ}{\ensuremath{{\mathsf Z}}\xspace}
+  
+  %% Bold Alphabets
+  \newcommand{\bA}{\ensuremath{{\mathbf A}}\xspace}
+  \newcommand{\bB}{\ensuremath{{\mathbf B}}\xspace}
+  \newcommand{\bC}{\ensuremath{{\mathbf C}}\xspace}
+  \newcommand{\bD}{\ensuremath{{\mathbf D}}\xspace}
+  \newcommand{\bE}{\ensuremath{{\mathbf E}}\xspace}
+  \newcommand{\bF}{\ensuremath{{\mathbf F}}\xspace}
+  \newcommand{\bG}{\ensuremath{{\mathbf G}}\xspace}
+  \newcommand{\bQ}{\ensuremath{{\mathbf Q}}\xspace}
+  \newcommand{\bU}{\ensuremath{{\mathbf U}}\xspace}
+  \newcommand{\bu}{\ensuremath{{\mathbf u}}\xspace}
+  \newcommand{\bV}{\ensuremath{{\mathbf V}}\xspace}
+  \newcommand{\bv}{\ensuremath{{\mathbf v}}\xspace}
+  \newcommand{\br}{\ensuremath{{\mathbf r}}\xspace}
+  
+  %% Black-board Bold Alphabets
+  \newcommand{\bbA}{\ensuremath{{\mathbb A}}\xspace}
+  \newcommand{\bbB}{\ensuremath{{\mathbb B}}\xspace}
+  \newcommand{\bbC}{\ensuremath{{\mathbb C}}\xspace}
+  \newcommand{\bbD}{\ensuremath{{\mathbb D}}\xspace}
+  \newcommand{\bbE}{\ensuremath{{\mathbb E}}\xspace}
+  \newcommand{\bbF}{\ensuremath{{\mathbb F}}\xspace}
+  \newcommand{\bbG}{\ensuremath{{\mathbb G}}\xspace}
+  \newcommand{\bbH}{\ensuremath{{\mathbb H}}\xspace}
+  \newcommand{\bbI}{\ensuremath{{\mathbb I}}\xspace}
+  \newcommand{\bbJ}{\ensuremath{{\mathbb J}}\xspace}
+  \newcommand{\bbK}{\ensuremath{{\mathbb K}}\xspace}
+  \newcommand{\bbN}{\ensuremath{{\mathbb N}}\xspace}
+  \newcommand{\bbO}{\ensuremath{{\mathbb O}}\xspace}
+  \newcommand{\bbP}{\ensuremath{{\mathbb P}}\xspace}
+  \newcommand{\bbQ}{\ensuremath{{\mathbb Q}}\xspace}
+  \newcommand{\bbR}{\ensuremath{{\mathbb R}}\xspace}
+  \newcommand{\bbS}{\ensuremath{{\mathbb S}}\xspace}
+  \newcommand{\bbT}{\ensuremath{{\mathbb T}}\xspace}
+    \newcommand{\bbZ}{\ensuremath{{\mathbb Z}}\xspace}
+
+
+%% Crypto syntax
+\newcommand{\getsr}{\ensuremath{\xleftarrow{\$}}\xspace}
+\newcommand{\zo}{\ensuremath{{\{0,1\}}}\xspace}
+\newcommand{\ZO}{\ensuremath{{\{0,1\}}}\xspace}
+\newcommand{\bit}{\ensuremath{{\{0,1\}}}\xspace}
+% \newcommand{\share}[1]{\ensuremath{\llbracket #1 \rrbracket}}
+\newcommand{\prg}{\ensuremath{\mathsf{PRG}}\xspace}
+\newcommand{\perm}{\ensuremath{\mathsf{Perm}}\xspace}
+
+\newcommand{\RSS}{\ensuremath{\mathsf{RSS}}\xspace}
+\newcommand{\diag}{\ensuremath{\mathrm{diag}}\xspace}
+\newcommand{\Add}{\ensuremath{\mathsf{Add}}\xspace}
+\newcommand{\Mult}{\ensuremath{\mathsf{Mult}}\xspace}
+
+\newcommand{\PCG}{\ensuremath{\mathsf{PCG}\xspace}}
+\newcommand{\Gen}{\ensuremath{\mathsf{Gen}\xspace}}
+\newcommand{\Expand}{\ensuremath{\mathsf{Expand}\xspace}}
+\newcommand{\key}{\ensuremath{\mathsf{k}}\xspace}
+
+\newcommand{\RSample}{{\sf RSample}}
+\newcommand{\HSS}{{\sf HSS}}
+\newcommand{\Share}{{\sf Share}}
+\newcommand{\Eval}{{\sf Eval}}
+\newcommand{\Ring}{\mathcal{R}}
+\newcommand{\sk}{{\sf sk}}
+\newcommand{\ek}{{\sf ek}}
+
+\newcommand{\MHSS}{{\sf MHSS}} %%%%%
+
+\newcommand{\Sim}{\ensuremath{\mathsf{Sim}}\xspace} 
+
+% Probability measures
+\newcommand{\randomto}{{\:{{\raisebox{.75pt}{$\scriptscriptstyle\$$}\hspace*{-3pt}}\rightarrow}\:}}
+\newcommand{\getsralign}{{{\leftarrow{\hspace*{-3pt}\raisebox{.75pt}{$\scriptscriptstyle\$$}}}}}
+
+\newcommand{\SD}{\ensuremath{\mathsf{SD}}\xspace}           %Statistical distance
+\newcommand{\shanent}{\ensuremath{\mathsf{H}}\xspace}       %Shannon entropy
+\newcommand{\minent}{\ensuremath{\mathsf{H}_\infty}\xspace} %Min entropy
+
+
+% Math
+\newcommand{\groupin}{\ensuremath{\Group_\text{in}}\xspace}     % Input group
+\newcommand{\groupout}{\ensuremath{\Group_\text{out}}\xspace}   % Output group
+\newcommand{\fieldout}{\ensuremath{\F_\text{out}}\xspace}      
+
+
+
+%% DPF parameters
+\newcommand{\domsize}{\ensuremath{n}\xspace}     % Domain size
+\newcommand{\weight}{\ensuremath{t}\xspace}  % Number of non-zero points. 
+
+
+
+
+\newcommand{\G}{\ensuremath{\mathsf{G}}\xspace}
+\newcommand{\GG}{\ensuremath{\mathbb{G}}\xspace}
+\newcommand{\FF}{\ensuremath{\mathbb{F}}\xspace}
+\newcommand{\ZZ}{\ensuremath{\mathbb{Z}}\xspace}
+\newcommand{\state}{\ensuremath{u}\xspace}
+\newcommand{\reveal}{\ensuremath{\mathsf{reveal}}\xspace}
+\newcommand{\bitDecomp}{\ensuremath{\mathsf{bitDecomposition}}\xspace}
+\newcommand{\tritDecomp}{\ensuremath{\mathsf{tritDecomposition}}\xspace}
+\newcommand{\append}{\ensuremath{\mathsf{append}}\xspace}
+\newcommand{\shuffle}{\ensuremath{\mathsf{shuffle}}\xspace}
+\newcommand{\powerset}{\ensuremath{\mathsf{powerSet}}\xspace}
+\newcommand{\convert}{\ensuremath{\mathsf{convert}}\xspace}
+\newcommand{\unitVec}{\ensuremath{\mathsf{unitVector}}\xspace}
+\newcommand{\concat}{\ensuremath{\ ||\ }\xspace}
+\newcommand{\decomp}{\ensuremath{\mathsf{decomposition}}\xspace}
+\newcommand{\compose}{\ensuremath{\mathsf{composition}}\xspace}
+\newcommand{\prefix}{\ensuremath{\mathsf{prefix}}\xspace} 
+\newcommand{\correctionWord}{\ensuremath{\mathsf{correctionWord}}\xspace} 
+
+
+\newcommand{\set}{\ensuremath{\mathcal{S}}\xspace}
+\newcommand{\partition}{\ensuremath{\mathsf{partition}}\xspace} 
+
+\newcommand{\sort}{\mathsf{sort}}
+\renewcommand{\perm}{\mathsf{perm}}
+\renewcommand{\t}{\tau}
+\newcommand{\SharedIPD}{\ensuremath{\mathsf{UnitSparseInnerProd}}\xspace}
+\newcommand{\bigstateCW}{\textsf{bigstate-cw}}
+\newcommand{\bitInjection}{\ensuremath{\mathsf{bitInjection}}\xspace}
+
+\newcommand{\dedup}{\textsf{dedup}\xspace}
+\newcommand{\updateLeave}{\textsf{updateLeaves}\xspace}
+
+\definecolor{darkred}{rgb}{0.5, 0, 0} 
+\definecolor{darkgreen}{rgb}{0, 0.5, 0} 
+\definecolor{darkblue}{rgb}{0,0.2,0.13} 
+
+\hypersetup{
+	colorlinks=true,
+	linkcolor=darkred,
+	citecolor=darkgreen,
+	urlcolor=darkblue   
+}
+
+\newcommand{\SumDmpf}{\textsf{SumDmpf}\xspace}
+\newcommand{\RcDmpf}{\textsf{RcDmpf}\xspace}
+%% References%%%%%%%%%%%%%
+\newcommand{\namedref}[2]{\hyperref[#2]{#1~\ref*{#2}}\xspace}
+\newcommand{\claimref}[1]{\namedref{Claim}{clm:#1}}
+\newcommand{\subclaimref}[1]{\namedref{Sub-Claim}{subclm:#1}}
+\newcommand{\lemmaref}[1]{\namedref{Lemma}{lem:#1}}
+\newcommand{\sublemmaref}[1]{\namedref{Sub-Lemma}{sublem:#1}}
+\newcommand{\theoremref}[1]{\namedref{Theorem}{thm:#1}}
+\newcommand{\importedtheoremref}[1]{\namedref{Imported Theorem}{impthm:#1}}
+\newcommand{\importedlemmaref}[1]{\namedref{Imported Lemma}{implemma:#1}}
+
+\newcommand{\corolref}[1]{\namedref{Corollary}{#1}}
+\newcommand{\figureref}[1]{\namedref{Figure}{#1}}
+\newcommand{\equationref}[1]{\namedref{Equation}{#1}}
+\newcommand{\defref}[1]{\namedref{Definition}{#1}}
+\newcommand{\observationref}[1]{\namedref{Observation}{#1}}
+\newcommand{\procedureref}[1]{\namedref{Procedure}{#1}}
+\newcommand{\stepref}[1]{\namedref{Step}{#1}}
+
+\newcommand{\sectionref}[1]{\namedref{Section}{#1}}
+\newcommand{\appendixref}[1]{\namedref{Appendix}{#1}}
+\newcommand{\tableref}[1]{\namedref{Table}{#1}}
+
+
+
+%%% Padded group by functionality
+
+\newcommand{\fpgb}{\ensuremath{\cF_\text{padded-group-by}}\xspace}
+\newcommand{\pipgb}{\ensuremath{\Pi_\text{padded-group-by}}\xspace}
+\newcommand{\pgbpad}{\ensuremath{t}}
+\newcommand{\pgbkeydom}{\ensuremath{[K]}}
+\newcommand{\pgbkeydomsize}{\ensuremath{K}}

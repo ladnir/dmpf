@@ -1,0 +1,315 @@
+@inproceedings{boyle2020efficient,
+  title={Efficient pseudorandom correlation generators from ring-LPN},
+  author={Boyle, Elette and Couteau, Geoffroy and Gilboa, Niv and Ishai, Yuval and Kohl, Lisa and Scholl, Peter},
+  booktitle={Advances in Cryptology--CRYPTO 2020: 40th Annual International Cryptology Conference, CRYPTO 2020, Santa Barbara, CA, USA, August 17--21, 2020, Proceedings, Part II 40},
+  pages={387--416},
+  year={2020},
+  organization={Springer}
+}
+@inproceedings{foleage,
+  title={FOLEAGE: F 4 OLE-based multi-party computation for Boolean circuits},
+  author={Bombar, Maxime and Bui, Dung and Couteau, Geoffroy and Couvreur, Alain and Ducros, Cl{\'e}ment and Servan-Schreiber, Sacha},
+  booktitle={International Conference on the Theory and Application of Cryptology and Information Security},
+  pages={69--101},
+  year={2024},
+  organization={Springer}
+}
+@article{silentium,
+  title={Silentium: Implementation of a Pseudorandom Correlation Generator for Beaver Triples},
+  author={Rieder, Vincent},
+  journal={Cryptology ePrint Archive \& International Workshop on Foundations and Applications of Privacy-Enhancing Cryptography},
+  year={2025}
+}
+@inproceedings{anyField,
+  title={Efficient pseudorandom correlation generators for any finite field},
+  author={Li, Zhe and Xing, Chaoping and Yao, Yizhou and Yuan, Chen},
+  booktitle={Annual International Conference on the Theory and Applications of Cryptographic Techniques},
+  pages={145--175},
+  year={2025},
+  organization={Springer}
+}
+@inproceedings{pcgZ2k,
+  title={Efficient Pseudorandom Correlation Generators over Z/pk Z},
+  author={Li, Zhe and Xing, Chaoping and Yao, Yizhou and Yuan, Chen},
+  booktitle={Annual International Cryptology Conference},
+  pages={207--240},
+  year={2025},
+  organization={Springer}
+}
+@inproceedings{permCor,
+  title={Efficient permutation correlations and batched random access for two-party computation},
+  author={Peceny, Stanislav and Raghuraman, Srinivasan and Rindal, Peter and Shah, Harshal},
+  booktitle={IACR International Conference on Public-Key Cryptography},
+  pages={76--109},
+  year={2025},
+  organization={Springer}
+}@article{sort,
+  title={An efficient secure three-party sorting protocol with an honest majority},
+  author={Chida, Koji and Hamada, Koki and Ikarashi, Dai and Kikuchi, Ryo and Kiribuchi, Naoto and Pinkas, Benny},
+  journal={Cryptology ePrint Archive},
+  year={2019}
+}
+@article{hamburg2015ed448,
+  title={Ed448-Goldilocks, a new elliptic curve},
+  author={Hamburg, Mike},
+  journal={Cryptology ePrint Archive},
+  year={2015}
+}
+@misc{goldilocks,
+  title        = {Plonky2: Fast Recursive Arguments with PLONK and FRI},
+  author       = {{Polygon Zero Team}},
+  howpublished = {\url{https://docs.rs/crate/plonky2/latest/source/plonky2.pdf}},
+  year         = {2022},
+  note         = {See \S2 ``Field selection'' for the choice \(p=2^{64}-2^{32}+1\) (Goldilocks) and fast reduction},
+}
+
+@misc{goldilocks2,
+  author       = {Remco Bloemen},
+  title        = {The Goldilocks Prime},
+  howpublished = {\url{https://xn--2-umb.com/22/goldilocks/}},
+  year         = {2022},
+  note         = {Discussion of the Goldilocks prime and roots-of-unity properties},
+}
+@INPROCEEDINGS {dmpf,
+author = { Boyle, Elette and Gilboa, Niv and Hamilis, Matan and Ishai, Yuval and Tu, Yaxin },
+booktitle = { 2025 IEEE Symposium on Security and Privacy (SP) },
+title = {{ Improved Constructions for Distributed Multi-Point Functions }},
+year = {2025},
+volume = {},
+ISSN = {},
+pages = {2414-2432},
+abstract = { A Distributed Point Function (DPF) is a crypto-graphic primitive used for compressing additive secret shares of a secret unit vector across two parties. Many DPF applications require compressed shares of a sparse weight- t vector, namely a Distributed Multi-Point Function (DMPF). Despite the strong motivation and prior optimization efforts, in most use cases the best practical implementation of DMPF is still a simple brute-force combination of $t$ independent DPFs. We present new constructions and optimized implementations of DMPFs in different parameter regimes, providing significant efficiency savings over existing approaches. We showcase our new constructions within applications of pseu-dorandom correlation generators (PCGs) and 2-server private set intersection (PSI). Incorporating our tools into the state-of-the-art PCG for “silent” generation of binary multiplication triples (FOLEAGE, Bombar et al, ePrint'24) yields a x2.68 improvement in throughput, with only x 1.4 blowup in the seed size. On a single core of our benchmark machine, our implementation silently generates up to 22.1 million triples per second, outperforming even the best “non-silent” protocol (Roy, CRYPTO'22), which generates 16 million triples per second. },
+keywords = {Privacy;Protocols;Correlation;Additives;Benchmark testing;Throughput;Vectors;Generators;Cryptography;Optimization},
+doi = {10.1109/SP61157.2025.00044},
+url = {https://doi.ieeecomputersociety.org/10.1109/SP61157.2025.00044},
+publisher = {IEEE Computer Society},
+address = {Los Alamitos, CA, USA},
+month =May}
+
+@inproceedings{mp-spdz,
+    author = {Marcel Keller},
+    title = {{MP-SPDZ}: A Versatile Framework for Multi-Party Computation},
+    booktitle = {Proceedings of the 2020 ACM SIGSAC Conference on
+    Computer and Communications Security},
+    year = {2020},
+    doi = {10.1145/3372297.3417872},
+    url = {https://doi.org/10.1145/3372297.3417872},
+}
+@inproceedings{dpf,
+  title={Distributed point functions and their applications},
+  author={Gilboa, Niv and Ishai, Yuval},
+  booktitle={Advances in Cryptology--EUROCRYPT 2014: 33rd Annual International Conference on the Theory and Applications of Cryptographic Techniques, Copenhagen, Denmark, May 11-15, 2014. Proceedings 33},
+  pages={640--658},
+  year={2014},
+  organization={Springer}
+}
+@inproceedings{dpf2,
+  title={Function secret sharing: Improvements and extensions},
+  author={Boyle, Elette and Gilboa, Niv and Ishai, Yuval},
+  booktitle={Proceedings of the 2016 ACM SIGSAC conference on computer and communications security},
+  pages={1292--1303},
+  year={2016}
+}
+
+@inproceedings{fss,
+  title={Function secret sharing},
+  author={Boyle, Elette and Gilboa, Niv and Ishai, Yuval},
+  booktitle={Annual international conference on the theory and applications of cryptographic techniques},
+  pages={337--367},
+  year={2015},
+  organization={Springer}
+}
+
+@inproceedings{boyle2022programmable,
+  title={Programmable distributed point functions},
+  author={Boyle, Elette and Gilboa, Niv and Ishai, Yuval and Kolobov, Victor I},
+  booktitle={Annual International Cryptology Conference},
+  pages={121--151},
+  year={2022},
+  organization={Springer}
+}
+@inproceedings{corrigan2015riposte,
+  title={Riposte: An anonymous messaging system handling millions of users},
+  author={Corrigan-Gibbs, Henry and Boneh, Dan and Mazi{\`e}res, David},
+  booktitle={2015 IEEE Symposium on Security and Privacy},
+  pages={321--338},
+  year={2015},
+  organization={IEEE}
+}
+@inproceedings{prio,
+  title={Prio: Private, robust, and scalable computation of aggregate statistics},
+  author={Corrigan-Gibbs, Henry and Boneh, Dan},
+  booktitle={14th USENIX symposium on networked systems design and implementation (NSDI 17)},
+  pages={259--282},
+  year={2017}
+}
+@misc{Stationary,
+      author = {Vladimir Kolesnikov and Stanislav Peceny and Srinivasan Raghuraman and Peter Rindal},
+      title = {Stationary Syndrome Decoding for Improved {PCGs}},
+      howpublished = {Cryptology {ePrint} Archive, Paper 2025/295},
+      year = {2025},
+      url = {https://eprint.iacr.org/2025/295}
+}
+@article{vdaf,
+  title={Verifiable distributed aggregation functions},
+  author={Davis, Hannah and Patton, Christopher and Rosulek, Mike and Schoppmann, Phillipp},
+  journal={Cryptology ePrint Archive},
+  year={2023}
+}
+@article{asi2025preamble,
+  title={PREAMBLE: Private and efficient aggregation of block sparse vectors and applications},
+  author={Asi, Hilal and Feldman, Vitaly and Keller, Hannah and Rothblum, Guy N and Talwar, Kunal},
+  journal={arXiv preprint arXiv:2503.11897},
+  year={2025}
+}
+@article{kirsch2010more,
+  title={More robust hashing: Cuckoo hashing with a stash},
+  author={Kirsch, Adam and Mitzenmacher, Michael and Wieder, Udi},
+  journal={SIAM Journal on Computing},
+  volume={39},
+  number={4},
+  pages={1543--1561},
+  year={2010},
+  publisher={SIAM}
+}
+@article{mpPSI,
+  title={Efficient VOLE based Multi-Party PSI with Lower Communication Cost},
+  author={Zhang, Shuqing},
+  journal={Cryptology ePrint Archive},
+  year={2023}
+}
+
+@inproceedings{volePSI,
+  title={VOLE-PSI: fast OPRF and circuit-PSI from vector-OLE},
+  author={Rindal, Peter and Schoppmann, Phillipp},
+  booktitle={Annual International Conference on the Theory and Applications of Cryptographic Techniques},
+  pages={901--930},
+  year={2021},
+  organization={Springer}
+}
+@inproceedings{blazingPSI,
+  title={Blazing fast PSI from improved OKVS and subfield VOLE},
+  author={Raghuraman, Srinivasan and Rindal, Peter},
+  booktitle={Proceedings of the 2022 ACM SIGSAC conference on computer and communications security},
+  pages={2505--2517},
+  year={2022}
+}
+@article{demmler2018pir,
+  title={PIR-PSI: scaling private contact discovery},
+  author={Demmler, Daniel and Rindal, Peter and Rosulek, Mike and Trieu, Ni},
+  journal={Proceedings on Privacy Enhancing Technologies},
+  year={2018}
+}
+@inproceedings{pinkas2018efficient,
+  title={Efficient circuit-based PSI via cuckoo hashing},
+  author={Pinkas, Benny and Schneider, Thomas and Weinert, Christian and Wieder, Udi},
+  booktitle={Annual International Conference on the Theory and Applications of Cryptographic Techniques},
+  pages={125--157},
+  year={2018},
+  organization={Springer}
+}
+@inproceedings{yeo2025private,
+  title={Private set intersection and other set operations in the third party setting},
+  author={Yeo, Foo Yee and Ying, Jason HM},
+  booktitle={34th USENIX Security Symposium (USENIX Security 25)},
+  pages={7723--7742},
+  year={2025}
+}
+@article{DBLP:journals/corr/abs-1204-4431,
+  author       = {Martin Aum{\"{u}}ller and
+                  Martin Dietzfelbinger and
+                  Philipp Woelfel},
+  title        = {Explicit and Efficient Hash Families Suffice for Cuckoo Hashing with
+                  a Stash},
+  journal      = {CoRR},
+  volume       = {abs/1204.4431},
+  year         = {2012},
+  url          = {http://arxiv.org/abs/1204.4431},
+  eprinttype    = {arXiv},
+  eprint       = {1204.4431},
+  timestamp    = {Mon, 13 Aug 2018 16:46:03 +0200},
+  biburl       = {https://dblp.org/rec/journals/corr/abs-1204-4431.bib},
+  bibsource    = {dblp computer science bibliography, https://dblp.org}
+}
+
+@inproceedings{inc-offline-online-pir,
+  title={Incremental $\{$offline/online$\}$$\{$PIR$\}$},
+  author={Ma, Yiping and Zhong, Ke and Rabin, Tal and Angel, Sebastian},
+  booktitle={31st USENIX Security Symposium (USENIX Security 22)},
+  pages={1741--1758},
+  year={2022}
+}
+@inproceedings{dpfKeygen,
+  title={Scaling ORAM for secure computation},
+  author={Doerner, Jack and Shelat, Abhi},
+  booktitle={Proceedings of the 2017 ACM SIGSAC Conference on Computer and Communications Security},
+  pages={523--535},
+  year={2017}
+}
+
+
+@inproceedings{cuckooDmpf,
+  title={Distributed vector-OLE: Improved constructions and implementation},
+  author={Schoppmann, Phillipp and Gasc{\'o}n, Adri{\`a} and Reichert, Leonie and Raykova, Mariana},
+  booktitle={Proceedings of the 2019 ACM SIGSAC Conference on Computer and Communications Security},
+  pages={1055--1072},
+  year={2019}
+}
+
+@misc{libOTe,
+    author = {Peter Rindal, Lance Roy},
+    title = {{libOTe: an efficient, portable, and easy to use Oblivious Transfer Library}},
+    howpublished = {\url{https://github.com/osu-crypto/libOTe}},
+}
+
+@article{cuckoo,
+  title={Cuckoo hashing},
+  author={Pagh, Rasmus and Rodler, Flemming Friche},
+  journal={Journal of Algorithms},
+  volume={51},
+  number={2},
+  pages={122--144},
+  year={2004},
+  publisher={Elsevier}
+}
+
+@inproceedings{yeo2023cuckoo,
+  title={Cuckoo hashing in cryptography: Optimal parameters, robustness and applications},
+  author={Yeo, Kevin},
+  booktitle={Annual International Cryptology Conference},
+  pages={197--230},
+  year={2023},
+  organization={Springer}
+}
+
+@misc{pcg2019,
+  author = {Elette Boyle and Geoffroy Couteau and Niv Gilboa and Yuval Ishai and Lisa Kohl and Peter Scholl},
+  title = {Efficient Pseudorandom Correlation Generators: Silent {OT} Extension and More},
+  howpublished = {Cryptology {ePrint} Archive, Paper 2019/448},
+  year = {2019},
+  url = {https://eprint.iacr.org/2019/448}
+}
+
+@misc{pcgQASD,
+  author = {Maxime Bombar and Geoffroy Couteau and Alain Couvreur and Cl{\'e}ment Ducros},
+  title = {Correlated Pseudorandomness from the Hardness of Quasi-Abelian Decoding},
+  howpublished = {Cryptology {ePrint} Archive, Paper 2023/845},
+  year = {2023},
+  url = {https://eprint.iacr.org/2023/845}
+}
+
+@misc{fssBatchCodes,
+  author = {Elette Boyle and Niv Gilboa and Yuval Ishai},
+  title = {Function Secret Sharing for Batch Codes},
+  howpublished = {Cryptology {ePrint} Archive, Paper 2019/273},
+  year = {2019},
+  url = {https://eprint.iacr.org/2019/273}
+}
+
+@misc{pcgConstOverheadOT,
+  author = {Elette Boyle and Geoffroy Couteau and Niv Gilboa and Yuval Ishai and Lisa Kohl and Nicolas Resch and Peter Scholl},
+  title = {Oblivious Transfer with Constant Computational Overhead},
+  howpublished = {Cryptology {ePrint} Archive, Paper 2023/817},
+  year = {2023},
+  url = {https://eprint.iacr.org/2023/817}
+}

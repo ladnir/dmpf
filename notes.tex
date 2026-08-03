@@ -1,0 +1,184 @@
+
+
+\subsection{Challenges and Motivation}
+
+\begin{itemize}
+  \item Many recent constructions (such as PCGs, others ?) require parties to establish a secret sharing of a ``large'' vector with ``low'' hamming weight (with payloads).
+
+  \item  For these constructions to be practically efficient, the above task needs to be done with communication that is sublinear in the length of the vector and ``good'' computational efficiency.
+
+  \item All (is this correct ?) of the existing works only provide estimates which are not practically impressive; let alone concrete benchmarks from an actual implementation.
+
+  \item In this work, we propose a variety of new ideas and optimizations for the above task. Also, we provide concrete benchmarks.
+\end{itemize}
+
+\subsection{Tasks that can be done}
+\begin{enumerate}
+  \item detail the important parts of ring LPN paper. What is the overall flow. This should help make more concrete what are the expensive and cheap operations in the protocol.
+
+  \item Precisely describe the noise distribution of the product polynomial. What if the input polys are uniform weight $t$. What is the input polys are regular weight $t$.
+
+    \amit{Performed some experimental analysis. Distribution is triangular.}
+
+  \item Finish formalizing what we want to achieve. We have $m=O(t)$ point function $f_1,...,f_{m}$, each of some size (maybe not all the same). We have $N$ final outputs $b_1,...,b_N$. Each $b_i$ will be the sum of one or more point function outputs. When leakage is considered, we will allow  $s<t$ of the points to fail to be inserted, these will be put into a "stash", revealed and handled in the plaintext domain.
+
+  \item Analyze what impact the leakage has on the product polynomials distribution. More concrete, the Adv knows a sparse weight $t$ polynomial $p\in \mathbb{F}[x]$ of degree $\leq N$. There is a secret product poly $P=p \cdot p'$ where $p'$ is a secret $t$ sparse poly. $P$ is degree $2N$ and has sparsity $t'\approx 2t$.
+
+    We perform the batch code encoding on these $t'$ points and out of the some $s$ of them are leaked. What does this reveal about $p'$? Can we precisely describe how much entropy/uncertainty the Adv has one $p'?$ Maybe we can say $p'=p'_1+p_2'$ where $p_2'$ is basically uniform in the view of Adv. If we can, then you can get a reduction to normal LPN by simply ensuring the $p_2'$ remains random enough for LPN to be hard.
+
+  \item Precisely describe the reduction to normal LPN when $p_2'$ is random enough.
+
+  \item Detail the cuckoo algorithm in the abstract setting.
+
+  \item Write down a concrete way to do cuckoo hashing as a circuit. See below for an outline
+
+  \item Analyse how big the failure events will be if we use the binning idea (randomly divide the region into bins. each bin can only have $c=O(1)$ points. If a region has more points, put them in the stash and reveal them).
+
+  \item Can we define the cuckoo hash functions $h_i(x)$ as simply sampling matrix $M_i$ and outputting $M_i\cdot x$?
+
+  \item Analyse the binning idea vs cuckoo hashing with very aggressive parameters (i.e. we allow cuckoo to have a big stash).
+
+  \item For cuckoo hashing, we will require 2 or 3 hash functions. this translate to our final outputs $b_i$ being the sum of 2 or 3 point function shares. What if I want the final output $b_i$ to be equal to one point function leaf value, i.e. $N$ leaf values instead of $2N$ or $3N$ for cuckoo. This implies that we are somehow leaking a "regular" distribution over our points. Describe this leakage distribution and try to give an MPC algorithm that would achieve it. Can just a thing be computed without $O(N)$ mpc work?
+
+    This idea is interesting when we combine it with stationary syndome decoding  / stationary LPN. When we use stationary, we generate the point functions once and then reuse the leaf values many times. Therefore, if we can ensure there are only $N$ leaf values compared to say $3N$, we will get a performance boost. This would likely come at the cost of a more expensive batch code setup. However, since the leaf values are reused many times, this expense can be amortized away.
+
+  \item Review other batch codes and report back. Ribbon filters might be interesting. Review CRYPTO 2023 paper on Cuckoo hashing.
+
+  \item In summary, we have the following degrees of freedom to play around with in trying to design a suitable hash function:
+
+    \begin{itemize}
+      \item Exploit the structure of the distribution where our data is coming from.
+
+      \item The hash function need not be succinct, i.e., its description size and computation time can be $O(t)$
+
+      \item We can have imperfect correctness which is equivalent to putting ``failed'' hash attempts in a stash. Hopefully, robustness of the LPN assumption against leakage will take care of this.
+    \end{itemize}
+
+\end{enumerate}
+
+\subsection{Hash function on distributional data}
+
+Suppose we have a vector $v$ of length $2N$. We will divide this vector into $B$ equally sized blocks, let's say $v = v_1 || \ldots || v_B$, where each $v_i$ is of length $\frac{2n}{B}$. We will further subdivide each $v_i$ into $b$ mini blocks, i.e. $v_i = v_{i, 1} || \ldots || v_{i, b}$ where each $v_{i, j}$ is of length $\frac{2n}{B \times b}$. Hence, in total, we have $B \times b$ mini-blocks. We will rearrange these mini-blocks into $b$ new larger blocks in the following way. Let $u_1, \ldots, u_b$ be the new blocks, each of length $\frac{2n}{b}$, where $u_i = v_{1, i} || \ldots || v_{B, i}$.
+
+\begin{claim}
+  Let $\cD$ denote the distribution over vectors of length $2N$ induced by multiplying two uniform degree $N$ polynomials with at-most $t$ non-zero coefficients. For all $i \in [b]$, let $k_i$ be a random variable indicating the number of non-zero entries in the block $u_i$. For appropriate choice of the parameters $b, B$, it holds that for all $i, j \in [b]$:
+
+  $$k_i \approx_s k_j$$
+\end{claim}
+
+\subsection{Ring LPN}
+
+\begin{definition}
+  Let $\R_{N, p}$ denote the ring of degree $N - 1$ polynomials with coefficients in $\Z_p$ for prime $p$. Let $\cD_{N, p, t}$ be the distribution of ``sparse polynomials'' over $\R$. The Ring LPN assumption says that:
+
+  $$(a, a \cdot e + f) \approx_c (a, u)$$
+
+  where $a, u \gets \cR$ and $e, f \gets \cD$.
+\end{definition}
+
+\subsection{OLE correlation}
+
+A two-party random OLE (ROLE) correlation over $\Z_p$ consists of party $\partya$ and $\partyb$ holding $(u, w_0)$ and $(v, w_1)$ respectively where $u, v \gets \Z_p$ and $w_0, w_1$ is a random additive sharing of $u \cdot v$.\\
+
+Two ROLE correlations can be locally converted into a single beaver triple correlation.
+
+\subsection{PCG for OLE correlations}
+
+Boyle et. al.~\cite{boyle2020efficient} showed a construction of PCG for a single sample of (R)OLE correlation using the Ring LPN assumption. However, they did not provide an explicit construction for the distributed generation of the PCG seeds.
+
+\subsection{Distributed generation of PCG seeds}
+
+The main challenge is the following: Each party $P_i$ holds a set of points $S_i \subset [N]$ where $|S| = t$. We have to securely generate a compressed (additive) sharing of the characteristic vector representation of set $S = \{ w | \exists u, v \in S_1 \times S_2 \text{\;s.t.\;} u + v = w \}$. Note that $S \subseteq [2N]$.
+
+The characteristic vector representation $v_S$ of a set $S \subseteq [N]$ is binary vector of length $N$ with $1$ at all locations indexed by the elements in $S$ and $0$ everywhere else. For e.g., suppose $N = 9$ and $S = \{3, 4, 9\}$. Then, $v_S = (0, 0, 1, 1, 0, 0, 0, 0, 1)$.
+
+In general, a compressed sharing of $v_S$ can be obtained in the following different ways:
+
+\begin{enumerate}
+  \item Naive: Using $|S|$ DPFs where each DPF is formed on a domain size of $N$. This requires a storage of $\approx |S| \secp \log N$ bits and expansion time of $\approx |S| N$ PRG calls.
+
+  \item Optimization: If the vector $v_S$ has a regular structure, meaning that every block of $k$ consecutive elements contains exactly a single non-zero element, e.g. $N = 9, k = 3, v_S = (0, 0, 1, 0, 1, 0, 0, 0, 1)$, then we can do better by using $|S|$ DPFs where each DPF is formed on a domain size of $N/|S|$ (instead of $N$). This requires a storage of $\approx |S| \secp (\log N - \log |S|)$ bits and expansion time of $\approx N$ PRG calls.
+
+  \item Using cuckoo hasing:
+\end{enumerate}
+
+\section{Peter's Notes}
+
+If input sets/poly are regular, then the product is triangular.
+
+\noindent
+x \\
+xx\\
+xxx\\
+xx\\
+x\\
+
+the $i$th bin will have an item from block $j_1$ from the first poly and block $j_2$ from the second poly such that $j_1+j_2=i, j_1<n,j_2<n$. If we use zero indexing block $i=0$ has a single element from $j_1=0$ combined with $j_2=0$. Block $i=3$ will have 4 items. etc. \amit{I am not sure if this is accurate. Consider, for example, degree $8$ input polynomials $p_1$ and $p_2$ whose coefficients (starting from the lowest degree term) are $(0, 0, 1 || 1, 0, 0 || 0, 1, 0)$ and $(0, 0, 1 || 0, 1, 0 || 1, 0, 0)$ respectively. Here $n = 9$ and block size $= 3$. Let $p = p_1 \cdot p_2$. Then the coefficients of $p$ would be $(0, 0, 0 || 0, 1, 1 || 1, 1, 1 || 1, 0, 1 || 0, 1, 0|| 0, 0, 0)$}
+
+For the $i$th, we know there are $t_i'\in[t]$ non-zeros (assuming no collisions). We can then process each bin semi-independently
+
+Prior work basically just said use $t_i'$ point functions for each bin and add them together.
+
+We currently have three strategies.
+
+\begin{enumerate}
+  \item \textbf{Use cuckoo}. For the i'th bin, we have some set of points within this bin. We will construct a cuckoo hash table of size $m=1.3t'_i$. If the $j$th position in this bin is occupied, it will be hashed to locations $h_1(j),h_2(j),h_3(j)\in [m]$. We need a way of figuring out where each of the $t'_i$ non-zeros should live given that each has 3 options.
+
+    The traditional way is for you start with the first non-zero at $j_1$ and place it at $h_1(j_1)$. The second non-zero $j_2$ is then also inserted at $h_1(j_2)$. If this position is occupied, the existing item is reinserted at its next hash position, in this case it would be $h_2(j_1)$.
+
+    You have to keep reinserting until everything is happy. If you set the parameters correctly,  everyone will find a home. However, as described this is a very deep circuit.
+
+    Alternatively, we could try to parallelize this. At the first iteration, we sort
+    $$
+    h(j_1),...,h_1(j_{t'_i})
+    $$
+    Items will then be sorted into chunks with the same value. For each chunk with value $p$ and we keep the first. We need to now reinsert the ones that didn't make it. For each that didn't make it, we use their next hash function value and resort. We can use a extra bit in the LSB so that items with a new hash function are always smaller than items that aren't reinserting. Therefore, after this second sort, the first item in each chunk will again be the item that stays.
+
+    You can repeat this some fixed number of times. We can bound experimentally how many times we need to run this "sort and update" so that all items are inserted with overwhelming probability. Sort also has some decently efficient implementations.
+
+    Once we have a cuckoo hash table, we will construct one point function for each $p\in[m]$. This point function will be expanded to get shares. These shares can then be rearranged and added together to get the overall shares of the product poly.
+
+    cuckoo hashing also has the notion of a "stash" where you can put items that you failed to insert after a fixed number of tries. in our context, we can have a stash but this would then mean for each stash position, we have to do a full size point function.
+
+  \item \textbf{Cuckoo with leakage.} We could just run the sorting ideal above a small number of times, maybe 4. For all items that fail to insert, we simply reveal their position. This would then allow the parties to manually insert them item there in plaintext which is basically free. We then need to analysis what this leakage means.
+
+    LPN in general can tolerate quite a bit of leakage. the regular structure is an example of such leakage.
+
+    This new leakage has some interesting interaction with the polynomial structure. If we leak that position $j$ has a point, then Party 1 with poly $P_1$ knows that one of there $t$ non-zeros positions $S_{1,1},...,S_{1,t}$ in $P_1$ add with one of the other parties positions $S_{2,1},...,S_{2,t}$ so that to equal $j$. i.e. they learn there exists $u,v\in [t]$ s.t. $S_{1,u}+S_{2,v}=j$.
+
+    To be conservative, we could just assume that the other party totally learns $u,v, S_{1,u},S_{2,v}$. The remaining LPN instance will still be hard given that there are enough remaining positions. I think we can get a reduction for this. We can also be a bit less conservative and say that we only leak some partial info on the noise and therefore the remaining entropy is still helping.
+
+    As another form of leakage, we can reveal which cuckoo positions are empty. This would leak something but not totally sure how to quantify it. But basically we could likely argue its not too much leakage. If you did reveal this, we could consider increasing $m$. The larger $m$ is, the less likely collisions are but the more leakage you would get from revealing empty cuckoo positions. interesting...
+
+    Also, instead of 3 hash functions we could use 1 or 2. In the case of 1, you don't need sorting at all. If there are multiple items in a position, then all but the first get revealed. This is very similar (identical) to the next idea.
+
+  \item \textbf{Reveal non-regular noise.} We can divide the polynomial into bins of some size. For each bin, we let there be a small constant number of noisy positions, e.g. 1 or 2. We reveal the positions of any additional positions we happen to have. We can dynamically choose the bin sizes so that they have in expectation 1 item per bin. That is, block $i$ can be divided into $t'_i$ bins. Each block $i$ has exact weight $t'_i$, the expected weight of each bin is $1$.
+
+\end{enumerate}
+
+Are there other schemes?
+
+\section{Amit's notes}
+
+At a high level, we have the following problem. We have a domain $[N]$ and set of items $S \subset [N]$ s.t. $|S| = t$. We have to create a pair of encodings $(s_0, s_1)$ such that each party $P_i$ can use its encoding $s_i$ to non-interactively compute a (sharing) of a bit $b_j$ indicating whether $j \in S$ for any $j \in [N]$. We have two efficiency requirements:
+
+\begin{itemize}
+  \item Succinctness of encodings (Property 1): Each encoding $s_i$ must be of bit length $t \times o(N)$. Looking ahead, this property is needed to ensure that the PCG seed size is sublinear. (Information-theoretic lowerbound : $t \log N$)
+  \item Efficient membership test (Property 2): Computing any bit $b_j$ indicating whether $j \in S$ should only require time $o(t, N)$. Alternatively, we would like to compute all $b_j$'s in time $N \times o(t)$ (with cuckoo-hashing this is $3N$, with regular structure on $S$, this is $N$). Ideally, we want $o(t)$ term to be $O(1)$.
+    (Information-theoretic lowerbound : $O(1)$ using hashmaps) $t\in [\lambda/2,2\lambda], N=2^{20}=\mathsf{poly}(\lambda)$.
+  \item MPC friendliness (Property 3): Let $\mathcal{A}$ be the (randomized algorithm) which outputs the encodings $(s_0, s_1)$ given the set $S$. We want this algorithm to admit an efficient 2PC protocol. By efficient, we mean that the communication cost should be $\approx t^2+t\log(N/t)$ and computation cost should be $\approx tN$ or more ideally $t+N$.
+\end{itemize}
+
+When $t = 1$, we can use DPF to satisfy all the properties
+
+When $t > 1$, a naive repetition of the standard DPF will satisfy Property 1 and [non-ideally] Property 3, but will not satisfy Property 2. Using cuckoo hashing, we can get all three properties in principle but practically Property 3 will not be efficient because the 2PC will be non black-box w.r.t. the cuckoo hash algorithm.
+
+Essentially, what the Cuckoo hash procedure does is the following: It randomly partitions the domain $[N]$ into $t' = O(t)$ ``bins'' s.t. all items in $S$ will land into a unique bin with high probability. Then, we encode each bin using a standard DPF thus requiring $t'$ many DPFs.
+
+\textbf{Observation}: Cuckoo hashing might be an overkill for applications where we have some additionally information about the set $S$ or only require the hashing to work for a subset $S' \subset S$. In our PCG for triples use-case, the set $S$ has a ``sparse gaussian'' distribution \amit{quantify this by writing down the exact probability distribution} over $N$. Moreover, we can chose to
+
+Maybe this works for cuckoo? first fixed all $x_1,x_2,...\in \{0,1\}^{\log N}$, sample $M_1,M_2,M_3\in \{0,1\}^{\log(1.3t)\times \log N}$:
+
+$$h_i(x_j) = M_i \cdot x_j$$
+
+we dont want collisions $h_1(x_1)=h_1(x_2)$.

@@ -1,0 +1,309 @@
+
+\section{Improved Bigstate DMPF.}\label{sec:bigState}
+
+Boyle et al.\cite{dmpf} introduced two new approaches to DMPF: an OKVS-based construction and the \emph{big-state} construction. 
+The OKVS variant uses \emph{oblivious key-value stores} to encode correction information for multiple indices, achieving good performance for very large $t$. 
+By contrast, the big-state construction is tailored for small to moderate weights $t$ (roughly $3 \leq t \leq 70$), which are precisely the regimes arising in pseudorandom correlation generators. This work has the major caveat that they focus on the trusted dealer setting where a central party construct the DPF keys and distirbuted them to the two evaluation parties. As such, they do not realize the API $\textsf{DMPF}(\share{A},\share{B})$ but instead requires the dealer to know $A,B$ in plaintext. Never the less, \cite{dmpf} does give a fully distributed protocol for their big state construction which we review next.
+
+The key insight of the big-state construction is to generalize the standard single point DPF protocol of \sectionref{sec:dpf} such that the ``tag bit'' vector that marks the active child on each level becomes a set of $t$ \emph{tag vectors}. Instead of each node $i$ carrying a single bit $\tau_i$ that determines which child is ``active,'' each node $i$ in the evaluation tree maintains  $t$ tag bits $\tau_{1,i},...,\tau_{t,i}$. As before, each tag vector is a unit vector, i.e. $|\tau_j|=1$. However, there are now $t$ check vectors and therefore there can be $t$ active children on each level.
+
+\begin{figure}\small
+	\centering
+	\fbox{ \begin{minipage}{.95\textwidth}
+    For public parameters $\kappa,n,w\in \mathbb{N}$, group $\mathbb{G}$, PRG $\mathsf{G}:\{0,1\}^\kappa \rightarrow\{0,1\}^{2t+2\kappa}$ , $D:=\lceil \log_w(n)\rceil$.\\
+    
+    \textsf{bigstate-DPF}: On input $\share{A}\in [0,n)^t,\share{B}\in \mathbb{G}^t$, party $p\in \{0,1\}$ computes:
+    \begin{enumerate}
+        \item $\share{\pi} := \sort(\share{A}), \share{A}:= \perm(\share{\pi},\share{A}), \share{B}:=\perm(\share{\pi},\share{B})$.
+        \item $\share{s^0_{0}}\gets \{0,1\}^\kappa$
+        \item $\share{\tau^0_{0}}:=\share{(1)\concat(0)^{t-1}}$
+        \item for $d\in [1,D]$
+        \begin{enumerate}
+            \item $\share{s_i'}_p:=\G(\share{s^{(d-1)}_i}_p)$ for $i\in [2^{d}]$
+            \item $\share{L_{k,\ell}}:= \SharedIPD(\share{\tau^{d-1}_{*,k}}, \share{s'_{*,l}})$ for $k\in [t], \ell\in [2t+2\kappa]$ 
+            \item for $k\in [t]:$ 
+            \begin{enumerate}
+                \item $(\share{z_0}\concat \share{z_1}\concat \share{b_0} \concat \share{b_1}) := L_k$ where $z_i\in \{0,1\}^\kappa, b_i\in \{0,1\}^t$
+                \item $\share{\sigma_k} := \zip(\share{z_{\share{\alpha_d}\oplus 1}}\cdot (1,1),(\share{b_{0,k}} \oplus \share{\alpha_d}\oplus 1, \share{b_{1,k}}\oplus \share{\alpha_d}))\in \{0,1\}^{2\times \kappa}$
+
+                \item for $i\in [0, 2^d)$: 
+                    $\share{s^d_i} || \share{\tau^d_i}:=\share{s_i'}\oplus \share{\tau^{d-1}_{i/2}} \sigma_{k, i \mod 2}$
+                
+            \end{enumerate}
+            \item if $d=D$:
+            \begin{enumerate}
+                \item convert the leaves to $\mathbb{G}$.            
+                \item use another instance of $\SharedIPD$ to compute the leaf correction values. 
+                \item update the leaves.            
+            \end{enumerate}
+        \end{enumerate}
+    \end{enumerate}
+    \vspace{10px}
+    \SharedIPD: On input $\share{u}\in \{x\in\{0,1\}^m \mid |x|\leq 1\}$ and $\share{v}\in \{x\in\{0,1\}^m \mid |x|\leq t\}$, the parties $p\in \{0,1\}$ compute:
+    \begin{enumerate}
+        \item select $s,s'\in \mathbb{N}$ s.t. $(1-(1-1/T)^{t-1})^s(1-2^{-s'})^s=\mathsf{negl}$ where $T:=\lceil\log_2(e)t\rceil\approx 1.44t$
+        \item for $i\in [s]$, let $P_i:=(P_{i,1},...,P_{i,T})$ where $P_{i,j} \gets \mathsf{powerSet}([m])$ s.t. $P_{i,j}\cap P_{i,j'}=\emptyset$ for all $j\neq j'$ and $\bigcup_j P_{i,j} = [m]$
+        \item for $i\in [s], j\in [T]$:
+        \begin{enumerate}
+            \item $R_{i,j}\gets\{0,1\}^{s\times |P_{i,j}|}$
+            \item $\share{x_{i,j}}:=\bigoplus_{k\in P_{i,j}} \share{u_k}$
+            \item $\share{y_{i,j}}:=R_{i,j} \cdot \share{v_{P_{i,j}}}$
+            \item $\share{c_{i,j}}:= (\share{y_{i,j}} = 0) \wedge \share{x_{i.j}}$
+        \end{enumerate}
+        \item output $\neg \bigvee_{i\in[s],j\in[t]}\share{c_{i,j}}$
+    \end{enumerate}
+    \end{minipage}}
+\caption{%
+  Big-state Distributed Multi-Point Function (DPF) protocol \cite{dmpf}. Does not include our optimized \SharedIPD protocol.  \label{fig:BS-Dmpf}
+}
+\end{figure}
+
+
+The parties expand the tree from root to leaf. At each level $d \in [1,D]$, the parties hold a \emph{single} random secret shared vector of seeds $\share{s^{d-1}}\in \{0,1\}^{\kappa\times 2^{d-1}}$ for the previous level. $s^{d-1}$ when viewed as a vector over $\{0,1\}^\kappa$ elements has hamming weight (at most) $t$. Party $p\in \{0,1\}$ expand their seed shared $\share{s^{d-1}_i}_p\in \{0,1\}^{\kappa}$ via the PRG $\G :\{0,1\}^\kappa\rightarrow \{0,1\}^{\kappa \times 2 + t \times 2}$ to obtain a total of $2^{d}$ children seeds $\share{s'}\in \{0,1\}^{\kappa \times 2^{d}}$ and tags $\share{\tau'}\in \{0,1\}^{2^d}$. However, $s'_i$ in general has hamming weight $2t$ instead of just the $t$ active children that we desire. In particular, each active child and its sibling will have a random seed value and tag bit while all others are zero. The challenge is to then compute $t$ correction values $L_{1},...,L_{t}\in \{0,1\}^{\kappa\times 2 + t \times 2}$ such that the sibling at index $i\oplus 1$ is corrected to have $s^{d}_{i\oplus 1}=0, \tau^d_{i\oplus 1} = 0$ while the active child $i$ has its tag bit corrected to $\tau^d_i=1$.
+
+Observe that the parent level has $t$ unit vectors $\share{\tau^{d-1}_1},...,\share{\tau^{d-1}_t}$ which encode the active parents. We want to use these to obliviously select the child values for each. For the single point case of $t=1$ there is a ``trivial'' method of just computing the sum of all left and right children. However, when $t>1$ this approach does not work as we get only one sum as opposed of selecting $t$ pairs of children. For example, with $t=2$
+\renewcommand{\sp}{\hspace{5.45px}}
+\begin{align*}
+    \tau^{d-1}_1 &:= 0\sp 0\sp 0\sp 1\sp 0\sp 0\sp 0\sp 0\\
+    \tau^{d-1}_2 &:= 0\sp 0\sp 0\sp 0\sp 0\sp 0\sp 1\sp 0\\
+    s' &:= 000000{a}{b}0000{c}{d}00\\
+\end{align*}
+The left sum would be $a+c$ while the right sum is $b+d$ but instead we want two pairs $(a,b)$ and $(c,d)$. Once we have these pairs we can compute the desired correction values using a constant sized MPC protocol. 
+
+To obtain these pairs, we want to compute the inner product of the unit vectors $\share{\tau^{d-1}_i}\in \{0,1\}^{2^{d-1}}$ with the weight (at most) $t$ vector $\share{s'}$, where we view each pair of siblings in $s'$ as a single element. \cite{dmpf} gave a protocol for doing this called  $\SharedIPD$. Unfortunently, this routines is inefficient and only better than a trivial linear time solution when $n \gg 2^{30}$. Their approach is reproduced in \SharedIPD of \figureref{fig:BS-Dmpf}. The idea is to perform the inner product not on the seed+tag vector with $\{0,1\}^{2\kappa+2t}$ elements but one bit at a time. That is, compute the inner product between a unit vector $\share{\tau^{d-1}_i}\in \{0,1\}^{2^{d-1}}$ and a vector $\share{v}$ with weight at most $t$. Given this, one can compute the general case by using $2\kappa+2t$ calls to  $\SharedIPD$, one for each bit of the seed and tag vectors.
+
+The idea is to reduce the general inner product problem between unit vector $u:=\tau^{d-1}_i\in \{0,1\}^m$ and weight at most $t$ vector $v\in \{0,1\}^m$ into many tiny checks using randomized 
+set partitions. Concretely, $\SharedIPD$ repeatedly partitions the index set $[m]$ into disjoint 
+blocks $P_{i,1},\dots,P_{i,T}\subset [m]$ such that each block covers a disjoint portion of the vector. 
+For each block $P_{i,j}$, the parties compute the XOR of the bits of $\share{u}$ restricted to 
+$P_{i,j}$, denoted $\share{x_{i,j}}$, and simultaneously apply a random linear map $R_{i,j}$ 
+to the corresponding coordinates of $\share{v}$ to obtain $\share{y_{i,j}}$. Since $\share{u}$ 
+is a unit vector, then exactly one block will contain the non-zero position. The check 
+$\share{c_{i,j}} := (\share{y_{i,j}}=0) \wedge \share{x_{i,j}}$ ensures that the block 
+containing the non-zero entry of $\share{u}$ also contains the matching entry of $\share{v}$. 
+By repeating this randomized partitioning $s$ times with fresh $R_{i,j}$ matrices, the 
+protocol guarantees with high probability that the true inner product is preserved while 
+false matches are eliminated. Finally, the parties combine the results and output 
+$\neg \bigvee_{i\in[s],j\in[T]} \share{c_{i,j}}$ as the decision bit.
+
+Intuitively, this procedure attempts to ``hash'' the weight-$t$ vector $\share{v}$ into 
+small buckets and check consistency with the unit vector $\share{u}$, without revealing 
+the positions of the non-zeros. While information-theoretically sound, the construction 
+requires $O(s \cdot T)$ sub-checks where $T\approx 1.44t$, and the randomized partitioning 
+must be repeated $s=\Theta(\log n)$ times to achieve negligible error. As a result, 
+$\SharedIPD$ is only asymptotically better than a trivial linear-time inner product when 
+$n \gg 2^{30}$, and in practice it is slower than simply performing the direct comparison. 
+This inefficiency is the main obstacle preventing Boyle et al.'s big-state DMPF from being 
+practically competitive in the fully distributed setting.
+
+
+
+
+
+
+\subsection{Improved \SharedIPD}
+
+We improve the basic idea of \cite{dmpf} by giving a more efficient protocol that also directly work when the weight $t$ vector has strings for elements, as opposed to bits. That is, $u\in\{0,1\}^m$ is a \emph{unit} vector; $v\in \{0,1\}^{\sigma \times m}$ has Hamming weight $\le t$ when viewed as vector of $\{0,1\}^\sigma$ elements. Given secret shares $\share{u},\share{v}$, we want $\share{\langle u,v\rangle}$ with only:
+(i) applying public linear maps to $\share{u}$ and $\share{v}$; and (ii) $O(\mathrm{poly}(t))$ nonlinear ops.
+
+
+Fix constants $c>2$ and let $\varepsilon:=2^{-\lambda}$ be the statistical security error.
+Let $B:=\lceil ct\rceil$ be the bucket size  and $R:=\Theta(\lambda)$ be the repetition factor. For each repetition $r\in[R]$, sample a public (pairwise-independent) hash
+$h_r:[m]\to[B]$ which maps positions into buckets. Let $H_r\in\{0,1\}^{B\times m}$ be the bucket matrix with $(H_r)_{b,k}=1$ iff $h_r(k)=b$. We compress the input vectors as:
+\[
+\share{U_r} :=  H_r\cdot\share{u} \in\{0,1\}^B,
+\qquad
+\share{V_r} := H_r\cdot\share{v} \in \{0,1\}^{\sigma\times B}.
+\]
+These are just public matrix-vector multiplies (bucketed sums).
+
+For each $r\in [R]$, compute the scalar
+\[
+\share{y_r} :=\share{U_r}^\top \share{V_r} = \sum_{b\in[B]} \share{U_{r,b}} \cdot \share{V_{r,b}},
+\]
+which uses $B=O(t)$ secret-shared multiplications (nonlinear) per repetition, requiring a total of $2RB$ OTs. Return the final answer as the bitwise majority of $\{\share{y_r}\}_{r\in [R]}$. This can be computed via a $R\sigma$ bit injection on $\share{y}$ and the summing each bit position to compute the frequency. Finally, it must be compared with the threshold requiring $\sigma$ comparisons of $R$ length strings. In total this requires approximately $2RB+4R\sigma$ OTs.
+
+\paragraph{Why this works.}
+Let $j^\star$ be the (unknown) index with $u_{j^\star}=1$. Then $U_r$ is one-hot at bucket $b^\star:=h_r(j^\star)$, so
+\[
+    y_r = (U_r)^\top (V_r) = (V_r)_{b^\star}
+    = \bigoplus_{k\in h_r^{-1}(b^\star)} v_k \in \mathbb{F}_2^\sigma.
+\]
+If no support element of $v$ collides with $j^\star$ in repetition $r$, then $y_r=v_{j^\star}=\langle u,v\rangle$. Each repetition has
+\(
+    \Pr[\text{collision at }b^\star]\le (t-1)/B \le 1/c < 1/2.
+\)
+Thus in expectation \emph{most} repetitions are collision-free. By Chernoff, with $R=\Theta(\lambda)$, the bitwise majority of $\{y_r\}$ equals $v_{j^\star}$ with probability at least $1-\varepsilon$. All maps from $\share{u}$ and $\share{v}$ to $\share{U_r},\share{V_r}$ are \emph{linear}, their size is $B=O(t)$, and the only nonlinear work is $O(R\cdot B)=O(t\lambda)$ secret multiplications
+plus $O(R\cdot \sigma)$ bitwise majorities (still $O(\mathrm{poly}(t))$).
+
+
+\subsection{Sketch with Detection}
+
+We now show that this can be further optimized such that $c>1$ by adding a mechanism to detect if a given bucket has exactly 1 non-zero element of $v$ in it. As before $B:=\lceil ct\rceil$. Pick $R$ independent public hash functions $h_r:[m]\to[B]$ mapping indices to bins.
+
+For fingerprints, pick public pairwise-independent matrices $\psi_r(k)\in\{0,1\}^{\rho\times \sigma}$ for each $k\in[m]$. For each repitions $r\in [R]$ and bucket $b\in [B]$ we derive values:
+\begin{align*}
+\share{U^{r}_b} &:= \bigoplus_{k\in h_r^{-1}(b)}  \share{u_k}\in\{0,1\},\\
+\share{V^{r}_b} &:= \bigoplus_{k\in h_r^{-1}(b)} \share{v_k}\in\{0,1\}^\sigma,\\
+\share{F^{r}_b} &:= \bigoplus_{k\in h_r^{-1}(b)} \psi_r(k)\share{v_k}\in\{0,1\}^{\rho}.
+\end{align*}
+
+As before, $U^r\in \{0,1\}^B$ is a unit vector. This repetitions is ``good'' if the bucket that contains the one from $u$ also contains at most 1 non-zero from $v$. We additionally compute the fingerprint $F^{r}_b\in \{0,1\}^\rho$ of the same subset. Each term in the fingerprint summation is randomized using $\psi_r(k)$. Let $j^\star\in [m]$ denote the (unknown) position where $u_{j^\star}=1$ and let $b^\star:=h_r(j^\star)$. We now compute the inner products between
+\begin{align*}
+    \share{V^{r}_\star} &:= \langle \share{U^r}, \share{V^{r}} \rangle \in\{0,1\}^\sigma,\\
+    \share{F^{r}_\star} &:= \langle \share{U^r}, \share{F^{r}} \rangle  \in\{0,1\}^{\rho}.
+\end{align*}
+
+These terms can all be computed using just $2RB$ OTs, two for each bit of $U$. To detect if the given bucket is good we muct compute the \emph{expected} fingerprint matrix from $\share{u}$:
+\[
+\share{\Psi^{r}} := \bigoplus_{k\in [m]} \share{u_k}\psi_r(k) \in \{0,1\}^{\rho\times \sigma}.
+\]
+This summation is over matrices. Then compute $\share{\widehat{F}^{r}}:=\share{\Psi^{r}}\cdot \share{V^{r}_\star}\in\{0,1\}^{\rho}$ using $\sigma$ OTs. Finally perform a single equality test
+\[
+\share{s^{r}} := \big(\share{F^{r}_\star} = \share{\widehat{F}^{r}}\big).
+\]
+If $s^{r}=1$, the bucket is (with overwhelming probability) a singleton containing $v_{j^\star}$, so we accept $\share{y_r}:=\share{V^{r}_\star}$ as the output for this repetition.
+
+\paragraph{Aggregation.} Output the first accepted candidate. This can be done using a binary tree over the $\share{s}$ vector to obtain the unit vector $\share{s}$ with 1 at the first non-zero position. The final output is then computed as
+
+\paragraph{Failure probability.}
+Let $q:=\Pr[\text{collision in one repetition}]$; with pairwise-independent $h_r$ and $B=\lceil c t\rceil$,
+\[
+q  = 1-\Big(1-\tfrac{1}{B}\Big)^{t-1}  \le \frac{t-1}{B}  \le \frac{1}{c}.
+\]
+A run fails if \emph{all} repetitions collide (no singleton) or we accept on a collided bucket
+due to a fingerprint coincidence. By a union bound,
+\[
+\Pr[\text{fail}]
+ \le \underbrace{q^R}_{\text{all collide}}
+ +\
+\underbrace{R\cdot 2^{-\rho}}_{\substack{\text{some collision}s\text{passes fingerprint}}}
+ \le c^{-R}  + R\cdot 2^{-\rho}.
+\]
+In particular, if you set $\epsilon=2^{-\lambda}$, it suffices to choose
+\[
+R  \ge \frac{\lambda+1}{\log_2 c}
+\qquad\text{and}\qquad
+\rho  \ge \lambda + \big\lceil \log_2(2R)\big\rceil
+\]
+so that $\Pr[\text{fail}] \le 2^{-\lambda}$.
+
+
+
+
+\paragraph{Failure probability.}
+With $B=\lceil c t\rceil$, the per-repetition collision probability satisfies
+\(
+q = 1-(1-1/B)^{t-1}\le 1/c.
+\)
+Over $R$ independent repetitions,
+\(\Pr[\text{fail}]\le c^{-R}+R\,2^{-\rho}\); e.g., choose
+\(R\ge (\lambda+1)/\log_2 c\), \(\rho\ge \lambda+\lceil\log_2(2R)\rceil\). Works for any \(c>1\).
+
+
+
+
+
+
+\paragraph{Cost.}
+Per repetition:
+(i) linear sketching into $B=O(t)$ buckets;
+(ii) $B$ masked multiplications to form $\share{V^{r}_\star}$ plus $B$ to form $\share{B^{r}_\star}$;
+(iii) $\rho\cdot \sigma$ bit-mults to compute $\share{\widehat{B}^{r}}$; and
+(iv) one $\rho$-bit equality.
+Total nonlinear work is $O\!\big(R(B+\rho \sigma)\big)=O\!\big(tR+\rho \sigma R\big)$;
+since $R=\Theta(\lambda)$ and $\rho=\lambda+O(\log\lambda)$, this is $O\!\big(t\lambda + \sigma\lambda^2\big)$,
+with all preprocessing linear and independent of $m$.
+
+
+\paragraph{Comparison with majority-only aggregator.}
+Without fingerprints, set $B=\lceil c t\rceil$ with $c>2$ so $p=1-q>1/2$ and take
+$R\ge \ln(1/\epsilon) / (2(p-\tfrac12)^2)$ to get $\Pr[\text{fail}]\le e^{-2(p-\frac12)^2R}$.
+Costs are $2RB$ OTs of length $\sigma$ plus an $O(R\sigma)$ majority. With fingerprints, the bound becomes
+$\Pr[\text{fail}]\le c^{-R}+R\,2^{-\rho}$, works for any $c>1$, and per repetition uses
+$2B$ OTs of length $(\sigma{+}\rho)$ and $2\sigma$ OTs of length $\rho$ (plus one $\rho$-bit equality),
+often enabling smaller $B$ and lower total work for the same $\epsilon=2^{-\lambda}$.
+
+
+
+
+\paragraph{Comparison with the Original \texorpdfstring{$\SharedIPD$}{SharedIPD}}
+Per repetition \(i\in[s]\) and block \(j\in[T]\), compute \(\share{x_{i,j}}\in\{0,1\}\), \(\share{y_{i,j}}\in\{0,1\}^{s}\),
+then test \((\share{y_{i,j}}=0^s)\) and AND with \(\share{x_{i,j}}\).
+A zero-test on an \(s\)-bit vector costs \(O(s)\) nonlinear ops,
+this is \(O(\sigma s)\) per \((i,j)\).
+Across all \(sT\) pairs:
+\[
+{\#\text{ OTs} = O(\sigma\,s^2\,T)} \quad\text{with}\quad
+T=\lceil \log_2(e)\,t\rceil\approx 1.44\,t,s=\Theta(\log m),
+\]
+i.e., \(O\big(\sigma\,t\,(\log m)^2\big)\). This is constrasted with our which is just $O(\sigma t)$.
+
+Despite our improvements the concrete cost of this approach remains high as this proceedure must be run on each level of the tree. 
+
+
+
+
+
+\subsection{Non-blackbox Bigstate Keygen}
+
+\newcommand{\AMPRF}{\ensuremath{\mathsf{AMPRF}}}
+\newcommand{\AMPRG}{\ensuremath{\mathsf{AMPRG}}}
+
+\paragraph{Idea.}
+Let $\mathsf{KeyGen}_{\mathrm{BS}}(A,B;\,r)$ denote the \emph{trusted-dealer} big-state key generation
+algorithm of \cite{dmpf}, which on inputs $A\in[0,N)^t$, $B\in\GG^t$ and randomness $r$ outputs two evaluation keys
+$(K^0,K^1)$. We realize a fully distributed key generation by evaluating this function \emph{inside MPC}:
+the parties hold secret shares $\share{A},\share{B}$, run a generic MPC for the circuit of $\mathsf{KeyGen}_{\mathrm{BS}}$,
+and at the end \emph{selectively output} $K^p$ to party $p\in\{0,1\}$.
+All steps of the dealer algorithm are preserved; we only swap the PRG primitive for an MPC-friendly instantiation.
+
+\paragraph{Protocol (high-level, inside MPC).}
+\begin{enumerate}
+  \item \textbf{Sort \& permute} the $t$ indices (as in dealer): $\share{\pi}:=\sort(\share{A})$, then $\share{A}:=\perm(\share{\pi},\share{A})$, $\share{B}:=\perm(\share{\pi},\share{B})$.
+  \item \textbf{Initialize root}: sample $\share{s^0_0}\gets\{0,1\}^\kappa$; set the tag vector $\share{\t^0_0}:=\share{(1)\concat(0)^{t-1}}$.
+  \item \textbf{Decompose} $\share{A}$ into binary bits per depth: $(\share{\alpha_D},\ldots,\share{\alpha_1}) := \mathsf{decomposition}_2(\share{A})\in\{0,1\}^{t\times D}$.
+  \item \textbf{For each depth $d=1,\ldots,D$:}
+  \begin{enumerate}
+    \item \textbf{PRG expansion (AM--PRF).} For each nonzero parent seed $\share{s^{d-1}_i}$ (the big-state invariant ensures at most $t$ per level), compute
+    \[
+      (\share{s'_{2i}},\share{s'_{2i+1}},\share{b'_{1,i}},\share{b'_{2,i}})\ :=\ \AMPRG(\share{s^{d-1}_i}),
+    \]
+    yielding two $\kappa$-bit child seeds and two $t$-bit tag masks (all as shares).
+    \item \textbf{Dealer-style corrections.} Using \emph{dealer logic} (no \SharedIPD), compute the per-$k$ correction word for this level:
+    parse the PRG output to $(\share{z_1},\share{z_2},\share{b_1},\share{b_2})$ and set
+    \[
+      \share{\sigma_{k,d}} := \zip\!\Big(\share{z_{\ \share{\alpha_d}[k]\oplus 1}}\cdot (1,1),\ (\share{b_{1,k}}\oplus \share{\alpha_d}[k]\oplus 1,\ \share{b_{2,k}}\oplus \share{\alpha_d}[k])\Big),
+    \]
+    exactly as in the trusted-dealer spec of \cite{dmpf}.
+    \item \textbf{Apply corrections \& push tags/seeds} to obtain $\share{s^d_{*}}$ and $\share{\t^{d}_{*}}$ (one child remains active per $k$).
+  \end{enumerate}
+  \item \textbf{Leaves \& payload injection.} Compute per-leaf masks from $\msbs(\share{s^D_i})$ and inject $\share{B_k}$ via $\updateLeave$ $t$ times, as in the dealer.
+  \item \textbf{Selective outputs.} Reveal to party $p$ exactly the components that define its evaluation key $K^p$ (root seed share, per-depth $\sigma_{k,d}$ words, final balancing term), while keeping the other party’s key hidden.
+\end{enumerate}
+
+\paragraph{Security.}
+This is a straight secure evaluation of the dealer program. In the semi-honest (resp.\ malicious) model,
+security reduces to: (i) the PRF security of AM--PRF (as a replacement for $\G$), and (ii) the security of the underlying MPC compiler.
+Thus the resulting key distribution is computationally indistinguishable from the trusted-dealer output of \cite{dmpf}.
+
+\paragraph{Complexity.}
+Let $D=\lceil\log_2 n\rceil$.
+\begin{itemize}
+  \item \textbf{PRG cost.} By the big-state invariant, at most $t$ parents are active per depth.
+  We perform $O(t)$ PRG calls per level, hence $O(tD)$ total PRG calls. If an AM--PRF round uses $c_{\mathrm{mul}}=O(\kappa)$ multiplications, $R=O(1)$ rounds per block, and we need $\lceil(2\kappa+2t)/w\rceil$ blocks per call, the arithmetic-multiplication cost is
+  \[
+    O\!\Big(tD \cdot R \cdot c_{\mathrm{mul}} \cdot \Big\lceil\frac{2\kappa+2t}{w}\Big\rceil\Big),
+  \]
+  plus linear operations. 
+  \item \textbf{Sorting $\share{A}$.} Sorting $t$ indices with a data-oblivious network costs $O(t\log^2 t)$ comparisons (Boolean multiplications). Or can be implemented using a specialized protocol with $O(t \log t)$ time\cite{permCor,sort}.
+  \item \textbf{Corrections/updates.} Per depth, $O(t(\kappa+t))$ linear ops and $O(t)$ bit-mults (for parity/lsb gates) suffice; total $O(tD)$ nonlinear gates beyond the PRG.
+  \item \textbf{No $\SharedIPD$.} We \emph{do not} execute the distributed inner product routine; all “dealer arithmetic” (select the active child per $k$ using $\alpha_d[k]$) happens \emph{inside} the MPC in the same way the dealer would.
+\end{itemize}
+
+\paragraph{Discussion.}
+This “non-blackbox” path is attractive when:
+(i) you already have a fast 2PC/MPC stack for word operations;
+(ii) $t$ is in the practical big-state regime (say $3\!-\!70$) so $O(t\log n)$ AM--PRF calls dominate; and
+(iii) you prefer engineering simplicity over custom distributed sub-protocols.
+Compared to \cite{dmpf}’s distributed route (which incurs an $n$-dependent $\SharedIPD$), this approach eliminates the $n$ dependence and replaces it with PRF rounds over words. We believe that this approach could be competitive with our reverse cuckoo hashing approach. Overall fewer PRG calls will be made but these PRG calls will be more expensive and require MPC evaluation of the PRG for every expansion.
