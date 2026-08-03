@@ -189,10 +189,16 @@ $d=128,256,256$ for $t=16,64,128$ give log-base-two batch failure bounds
 $-44.16,-44.71,-40.63$, respectively.  The corresponding two-choice sizes are
 $32768,65536,131072$ and are not practical.  These are placement-failure
 bounds only; Equation~\eqref{eq:ring-lpn-revcuckoo-leakage} is still required
-for the support leakage.  The current implementation derives $d$ directly
-from $(t,w)$ and does not use its \texttt{cuckooSecParam} argument; selecting
-these bounds therefore also requires exposing $d$ (or a validated failure
-target) in the initialization API.
+for the support leakage.  Allowing four choices gives a better finite-size
+tradeoff: $d=16,32,64$ for $t=16,64,128$ gives log-base-two batch bounds
+$-43.83,-49.08,-60.01$.  The simpler schedule $d=2t$ gives still larger
+margins $-59.90,-81.14,-92.02$, but is overprovisioned, particularly at
+$t=128$.  Since each extra choice adds another domain-sized partition pass,
+the best three-versus-four-choice point is ultimately a performance question.
+The current implementation supports only $w\in\{2,3\}$, derives $d$ directly
+from $(t,w)$, and does not use its \texttt{cuckooSecParam} argument; selecting
+these bounds therefore requires generalizing $w$ and exposing $d$ (or a
+validated failure target) in the initialization API.
 
 \iffull
 

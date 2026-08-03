@@ -88,19 +88,37 @@ Power-of-two partition sizes sufficient under the full Hall union bound are:
 | 3 | 16 | 64 | 128 |
 | 3 | 64 | 128 | 256 |
 | 3 | 128 | 256 | 256 |
+| 4 | 16 | 16 | 16 |
+| 4 | 64 | 32 | 32 |
+| 4 | 128 | 64 | 64 |
 
-For the recommended 256-set three-choice rows, the log2 batch failure bounds
-are respectively `-44.16`, `-44.71`, and `-40.63`.  The two-choice sizes are
-impractical; three choices are the clear route if ordinary 40-bit cuckoo
-failure is required.  These bounds address placement failure only.  The
+For the 256-set three-choice rows, the log2 batch failure bounds are
+respectively `-44.16`, `-44.71`, and `-40.63`.  With four choices the much
+smaller rows above give `-43.83`, `-49.08`, and `-60.01`.  The two-choice
+sizes are impractical, but three choices are not globally optimal once the
+number of choices is allowed to change.
+
+The simple four-choice schedule `d=2n` suggested during review is also valid
+with ample margin: its log2 batch bounds are `-59.90`, `-81.14`, and `-92.02`
+for `n=16,64,128`.  Relative to the three-choice rows it reduces total bins
+and the `w(d+40)` hash-width proxy at `n=16,64`, but is overprovisioned at
+`n=128`.  The Hall-minimal four-choice schedule `d=16,32,64` is smaller still.
+
+This does not settle performance from parameters alone.  Each additional
+choice adds another full domain-sized partition pass, and the expanded leaf
+work is proportional to `wN`; smaller `d` reduces the hash width, solver size,
+and number of bins.  Therefore `w=3` versus `w=4` should be selected with an
+end-to-end setup/expansion benchmark, especially for Stationary LPN where the
+expansion cost is repeated.  These bounds address placement failure only. The
 size-biased support leakage remains and must be covered by the explicit
 leakage-robust Ring-LPN/Stationary-LPN assumption.
 
-The implementation currently derives `d` directly from `n,w`; it has no
-override for these recommended values.  Adopting them therefore requires a
-separate implementation change to plumb an explicit partition size or a
-validated failure target through initialization, followed by performance
-measurement.
+The production implementation currently supports only `w=2,3` and derives
+`d` directly from `n,w`; it has no override for these recommended values.  The
+exact experiment harness supports arbitrary `w>=2`, but adopting a four-choice
+schedule requires a separate implementation change to generalize initialization
+and plumb an explicit partition size or validated failure target, followed by
+performance measurement.
 
 ## Reproduction
 
