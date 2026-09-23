@@ -30,7 +30,7 @@ This is the OLE correlation used by the PCG. Two independent OLE
 correlations yield one Beaver triple by local conversion.
 
 Write $A_{p,i}\in[0,N_{\mathsf R})^t$ and
-$B_{p,i}\in(\mathbb F_q\setminus\{0\})^t$ for a sparse polynomial's
+$B_{p,i}\in\mathbb F_q^t$ for a sparse polynomial's
 positions and coefficients. For equally long lists $A,B$, define
 $\mathsf{makePoly}(A,B):=\sum_j B_jX^{A_j}$.
 Cartesian sums of positions and products of coefficients give
@@ -59,10 +59,13 @@ split into independent two-polynomial instances.
 \paragraph{Regular product lists.}
 For regular noise, let $t\mid N_{\mathsf R}$ and
 $L:=N_{\mathsf R}/t$.
-Each party holds $P$ sparse polynomials, with one nonzero coefficient
+Each party holds $P$ sparse polynomials, with one selected position
 in each of $t$ blocks. For $p\in\{0,1\}$, $a\in[0,P)$, and $j\in[0,t)$,
 sample an offset $X_{p,a,j}\gets[0,L)$.
 Its absolute ring position is $jL+X_{p,a,j}$.
+Sample each coefficient independently from $\mathbb F_q$, including zero.
+We call the selected position sets the supports; the actual nonzero
+supports can be smaller.
 For a polynomial pair $(a,b)$ and $k\in[0,t)$, define the ordered list
 \begin{equation}\label{eq:ringlpn-product-list}
  A_{a,b,k}:=
@@ -95,7 +98,7 @@ it actually exposes.
 
 Fix a polynomial expansion bound $Q(\kappa)$.
 Sample the supports once from the prescribed distribution.
-At expansion $u\in[0,Q)$, sample independent nonzero coefficients to form
+At expansion $u\in[0,Q)$, sample independent coefficients from $\mathbb F_q$ to form
 $e^{(u)}_{p,i}$. Put $r_0^{(u)}:=1$ and independently sample
 $r_i^{(u)}\gets\mathbb R$ for $i\in[1,P)$.
 Write $\mathbf r^{(u)}:=(r_i^{(u)})_{i\in[0,P)}$.

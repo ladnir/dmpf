@@ -420,7 +420,7 @@ nonlinear matching count.  Three features make this plausibly benign for LPN:
        linear test of the Ring-LPN syndrome cannot directly consume the
        statement ``this support graph has more matchings.''
  \item \emph{The coefficients remain hidden.}  Reverse Cuckoo depends on
-       positions, not on the independent nonzero error coefficients.  Even a
+       positions, not on the independent uniform field coefficients.  Even a
        correct partial support hypothesis must still satisfy the large-field
        Ring-LPN equations.
 \end{enumerate}
@@ -526,7 +526,8 @@ stationary cross-expansion analysis identify additional attack surfaces, but
 we do not claim to have closed them.
 
 The most important structured attack reduces the ring modulo
-$X^{128}+a$.  The expected total folded support weight is $60.383$.  The
+$X^{128}+a$.  The expected total number of occupied residues is $60.383$.
+This counts selected positions, not nonzero coefficients after folding. The
 published conservative statistical-decoding model gives $128.450$ bits at
 that mean.  Low folded weights are materially weaker: averaging the same
 optimistic model over unconditioned noise gives $122.482$ bits.  We therefore
@@ -539,6 +540,8 @@ Each rejection resamples all four supports; later expansions retain the
 accepted supports. Other parameter sets retain the unfiltered sampler and
 are not certified by this estimate. The rejection is a security requirement,
 not a Reverse-Cuckoo mitigation.
+The filter tests only selected positions; it does not reject zero
+coefficients or prevent cancellation after folding.
 \appendixref{app:rc-hash-conditioning} accounts for its effect on programmed-hash
 correctness without assuming that the accepted offsets remain independent.
 
@@ -587,8 +590,8 @@ $\mathsf{RC\text{-}LPN}_b$ has challenge bit $b\in\{0,1\}$.
  shuffle and evaluator randomness. Let $\mathsf H$ contain all public
  evaluator seeds and programmed descriptors.
  Give $\mathsf H$ and party $p$'s supports to the adversary.
- \item For each expansion $u\in[0,Q)$, sample independent nonzero
- coefficients on both parties' supports. Write $e^{(u)}_{v,a}$ for
+ \item For each expansion $u\in[0,Q)$, sample independent coefficients
+ from $\mathbb F_q$ on both parties' supports, including zero. Write $e^{(u)}_{v,a}$ for
  party $v$'s polynomial $a\in[0,P)$. Give party $p$'s coefficients
  to the adversary.
  \item For each expansion $u$, put $r_0^{(u)}:=1$ and sample
@@ -608,6 +611,16 @@ The supports, filter, descriptors, and corrupted-party information have the
 same distribution in both experiments. Only the honest party's noisy ring
 samples are replaced; in the random experiment, those replacements are
 independent of the hidden supports and descriptors.
+
+The coefficient law matches the implementation; no zero rejection is required.
+For comparison with nonzero-coefficient models, couple the samplers until
+the first zero coefficient. Across both parties and $Q$ expansions, the
+statistical distance is at most $2PtQ/q$, approximately $Q\,2^{-57}$ for
+the Goldilocks profile with $P=4$ and $t=16$.
+This bounds the change in any fixed attack's success probability, not its
+work exponent, and does not establish a hardness ordering between the laws.
+The reported nonzero-coefficient attack estimates remain comparisons under
+that model; the assumption below uses uniform field coefficients.
 
 \begin{assumption}[Leakage-robust decisional Ring-LPN]
 \label{ass:rc-decisional-lpn}

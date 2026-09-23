@@ -75,9 +75,9 @@ path for this setup--state tradeoff.
 \subsection{Integration into Ring-LPN and Stationary-LPN PCGs}
 
 A Ring-LPN PCG must share products of sparse polynomials.
-With $P$ polynomials per party and $t$ nonzero coefficients per polynomial,
-each cross-party product has $t^2$ terms before cancellation.
-For regular noise, one coefficient lies in each block of length
+With $P$ polynomials per party and $t$ selected positions per polynomial,
+each cross-party product has $t^2$ indexed terms, possibly zero.
+For regular noise, one position lies in each block of length
 $L=N_{\mathsf R}/t$.
 The products reorganize into $P^2t$ lists, each with $t$ terms and a
 local domain of length $2L$.
