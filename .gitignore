@@ -1,0 +1,18 @@
+# Local Python environments and caches
+.venv/
+__pycache__/
+.pytest_cache/
+*.py[cod]
+
+# Generated LaTeX files (retain source figures and bibliography)
+/main.aux
+/main.bbl
+/main.blg
+/main.fdb_latexmk
+/main.fls
+/main.log
+/main.out
+/main.pdf
+/main.synctex.gz
+/output/
+/tmp/
