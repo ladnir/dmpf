@@ -33,12 +33,12 @@ cross-platform check. No new performance benchmarks were run.
 
 ## Remaining decisions and work
 
-1. **Implement Ring-LPN support rejection.** AUD-001 is still deferred. The
-   paper's concrete point samples four weight-16 supports and requires at
-   least 61 occupied residues modulo 128, counted separately by polynomial.
-   The implementation still samples unfiltered supports. Implement the
-   selected recipe with rejection tests and define behavior outside its
-   analyzed parameter point; do not silently extrapolate the threshold.
+1. **Ring-LPN support rejection implemented for the analyzed profile.**
+   Setup now filters Goldilocks supports at ring degree 2^20, four polynomials,
+   and weight 16. It requires at least 61 occupied residues modulo 128,
+   counted separately by polynomial, and resamples the whole tuple on
+   rejection. Other profiles retain their unfiltered, unvalidated sampler.
+   No threshold or security estimate is extrapolated to them.
 2. **Complete the OLE composition argument.** The DMPF functionality permits
    the corrupt output share to be selected. Show the target application
    correlation distribution and simulation, rather than inferring them
@@ -57,5 +57,5 @@ cross-platform check. No new performance benchmarks were run.
    distinguish infrastructure failures, and pin the final paper/code commits.
    No release tag or merge into a shared libOTe branch has been made.
 
-Recommended next substantive task: support rejection, followed by the OLE
-composition argument. Await Peter's direction on these gaps.
+Recommended next substantive task: the OLE composition argument. Await
+Peter's direction on the remaining gaps.

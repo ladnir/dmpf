@@ -42,6 +42,6 @@ boxes. Its PDF artifact is a build check, not a substitute for visual review.
 
 The current paper states its ideal-subprotocol and concrete-generator
 assumptions separately. The application-level OLE composition argument is
-not complete. The implementation's support-rejection filter remains a
-release task, and the paper's historical measurements do not describe all
+not complete. The implementation filters supports at the analyzed Goldilocks
+point; other parameter sets remain unvalidated. Historical measurements do not describe all
 current hardening changes. See `RELEASE_STATUS.md` for the release checkpoint.

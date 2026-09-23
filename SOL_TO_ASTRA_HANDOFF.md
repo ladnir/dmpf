@@ -19,6 +19,21 @@ or questionable changes, including protocol and parameter changes.
 
 ## Latest checkpoint: approved CWC corrections
 
+**2026-09-23 Ring-LPN support filter:** Peter approved implementing the
+analyzed rejection rule. `RingLpnSupportFilter` now accepts only tuples with
+at least 61 occupied residues modulo 128 across four weight-16 polynomials,
+counting each polynomial separately. Setup selects it only for scalar
+Goldilocks order and ring degree 2^20; both DMPF backends and OLE/triple modes
+use it at that ring degree. Rejection resamples the entire tuple locally;
+reusable expansion keeps the accepted supports. Other profiles retain their
+unfiltered sampler and have no security claim from this point. The paper's
+implementation-status note, audit tracker, and release notes are synchronized;
+the historical performance tables and all numerical security estimates are
+unchanged. See `analysis/ring_lpn_support_filter.md` in libOTe for the precise
+selection rule and regression coverage. Next: the application-level OLE
+composition argument, subject to Peter's direction; do not broaden the
+threshold to other fields or dimensions without analysis.
+
 **2026-09-07 prose deduplication:** Shortened repeated roadmaps in the
 introduction, overview, and DMPF section; compressed repeated DPF, Waterfall,
 PCG, and Reverse-Cuckoo scope explanations. Historical benchmark limitations

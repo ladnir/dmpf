@@ -533,8 +533,12 @@ optimistic model over unconditioned noise gives $122.482$ bits.  We therefore
 require the local support filter defined before
 \namedref{Proposition}{prop:rc-ringlpn-correctness}.  It accepts each party's sample with
 probability $0.501914$ and raises the averaged conservative estimate to
-$130.572$ bits.  The current prototype has a code-level TODO for this filter;
-the rejection is a security requirement, not a Reverse-Cuckoo mitigation.
+$130.572$ bits. The implementation applies this filter during setup for
+the Goldilocks profile $N_{\mathsf R}=2^{20}$, $P=4$, $t=16$.
+Each rejection resamples all four supports; later expansions retain the
+accepted supports. Other parameter sets retain the unfiltered sampler and
+are not certified by this estimate. The rejection is a security requirement,
+not a Reverse-Cuckoo mitigation.
 \appendixref{app:rc-hash-conditioning} accounts for its effect on programmed-hash
 correctness without assuming that the accepted offsets remain independent.
 
