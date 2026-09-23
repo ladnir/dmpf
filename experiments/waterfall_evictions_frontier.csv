@@ -1,0 +1,8 @@
+w,d,c,e,output_columns,main_one_hot_bits,generic_repair_scan_units,optimized_repair_scan_units,rough_optimized_repair_index_bit_ops,analysis,failure_log2,batch_security_bits,power_of_two_d
+3,32,2,12,98,1536,576,576,5760,conditional-sampling,-49.0158,41.0158,true
+3,40,2,8,122,1920,384,384,4608,conditional-sampling,-49.8765,41.8765,false
+3,48,2,4,146,2304,192,192,2304,conditional-sampling,-49.4954,41.4954,false
+3,52,2,2,158,2496,96,48,576,exact,-48.1602,40.1602,false
+3,56,2,2,170,2688,96,48,576,exact,-49.6486,41.6486,false
+3,64,2,2,194,3072,96,48,576,exact,-52.3214,44.3214,true
+3,128,0,18,384,6144,864,864,12096,conditional-sampling,-48.7177,40.7177,true

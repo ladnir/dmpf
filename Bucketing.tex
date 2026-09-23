@@ -1,99 +1,123 @@
-
 \section{Bucketing DMPF}\label{sec:bucketing}
 
-The Bucketing DMPF construction leverages the uniform distribution of non-zero entries in the input vectors to optimize protocol efficiency. By partitioning the input into multiple buckets or bins. Each bucket is then privately evaluated using a generic call to an underlying DMPF protocol, and the results are concatenated to produce the final output. This method improves scalability and performance, particularly when the non-zero points are clustered or follow a predictable distribution.
+Bucketing is useful when the input addresses are independent and uniform.
+Choose a public bucket count $k\mid N$, bucket capacity $c$, and
+$M:=N/k$. Address $A_i$ belongs to bucket $\lfloor A_i/M\rfloor$ and has
+local address $A_i\bmod M$. A padded Group-By operation collects the records
+for each bucket. One DMPF per bucket produces the corresponding interval of
+the output map.
 
-The protocol proceeds as follows. Given input vectors $\share{A}$ and $\share{B}$, the parties first choose a parameter $k$ indicating the number of buckets. Each input index $i$ is assigned to a bucket based on $A_i$ modulo $M:=N/k$, and the remainder of $A_i$ is used to determine the position within the bucket. The parties then group and reindex the inputs accordingly, collecting all elements for each bucket. For each bucket, the parties invoke a standard DMPF protocol on the grouped inputs, obtaining a partial output for each bucket domain. Finally, all DMPF outputs are concatenated in order to construct the overall output vector corresponding to the full domain.
+If any bucket receives more than $c$ rows, the construction may omit inputs
+and leak information through the Group-By opening.
+For independent uniform addresses and $c<t$, a union bound gives
+\[
+ \Pr[\text{overflow}]
+ \leq k\Pr[\operatorname{Bin}(t,1/k)>c]
+ \leq k\binom{t}{c+1}k^{-(c+1)}.
+\]
+The probability is zero for $c\geq t$.
+Choose $k,c$ to make this bound at most the desired $2^{-\lambda}$.
+The choice $k\asymp t/\log t$ is a scaling heuristic, not by itself a
+concrete security bound.
 
-If the keys are drawn uniformly at random and we choose the number of buckets $k = t/\log t$, then the expected number of items per bucket is $\log t$. Using Chernoff bounds, with overwhelming probability, no bucket will contain more than $O(\log t)$ elements. Thus, setting the bin capacity parameter $c = O(\log t)$ ensures that no bin overflows in this regime. 
+Let $C_{\mathsf{setup}}(M,c)$ and $C_{\mathsf{expand}}(M,c)$ be the costs
+of the chosen DMPF. The total costs include $k$ such calls, the Group-By
+cost, and $\Theta(N)$ output materialization.
+They are not $O(t)$ independently of $N$.
+The box below shows a single payload evaluation; it uses the reusable DMPF
+interface but does not specify a separate reusable Group-By implementation.
 
-With these parameters, the overall protocol achieves linear efficiency: There are $k = t/\log t$ buckets, each holding $O(\log t)$ items, so the total number of DMPF operations is $O(t)$. Each DMPF call is applied to a domain of size $N/k$ and a batch of $O(\log t)$ items, so both computation and communication scale as $O(t)$ overall. Additional local operations, such as bucketing and output concatenation, likewise require $O(t)$ work. Thus, the bucketing approach is highly scalable for large $t$ with uniform keys.
-
-
-\begin{figure}\small
-	\centering
-	\fbox{ \begin{minipage}{.95\textwidth}
-    Parameters: a bucket count $k$ and maximum capacity $c$. For uniform keys, suggested parameter $k = t/O(\log t), c = O(\log t)$.\\
-
-
-     $\textsf{BucketingDMPF}$: On input $\share{A}\in \domain^t,\share{B}\in \mathbb{G}^t$, party $p\in \{0,1\}$ computes:
-    
-    \begin{enumerate}
-        \item Let $M := N/k$ denote the domain size of items within a fixed bucket. For simplicity, we assume $k$ divides $N$.
-
-        \item For $i\in[t]$: $\share{A_i'}:=\share{A_i}/M, \share{A_i''}:=\share{A_i} \mod M$, note $A_i'\in [0,k)$.
-
-        \item $\share{A^*}\uzip \share{B^*}:=\textsf{Group-By}_{c}(\share{A'},\share{A''}  \zip \share{B})$
-
-
-        \item For $j \in [k]$, 
-
-        \begin{enumerate}
-            \item parties invoke $\share{z_j}:=\mathcal{F}_\mathsf{dmpf}(\share{A^*_j}\in (0,M]^c ,\share{B^*_j}\in \mathbb{G}^c)\in \mathbb{G}^M$.
-        \end{enumerate}
-
-
-        \item Output $\share{y}:=\share{z_1}||...||\share{z_k}\in \mathbb{G}^N$.
-            
-    \end{enumerate}
-        \end{minipage}}
-    \caption{Bucketing based Distributed multi-point function.\label{fig:bucketingDmpf}
-    }
+\begin{figure}[H]\small
+\centering
+\fbox{\begin{minipage}{.95\textwidth}
+Public parameters are $N,t,k,c\geq1$, $k\mid N$, and an additive group
+$\mathbb G$. Put $M:=N/k$.\\
+$\mathsf{BucketingDMPF}(\share A\in[0,N)^t,\share B\in\mathbb G^t)
+ \longrightarrow\share y\in\mathbb G^{[0,N)}$:\\[0.3em]
+Party $p\in\{0,1\}$ computes:
+\begin{enumerate}
+ \item For $i\in[0,t)$, set $\share{A'_i}:=\lfloor\share A_i/M\rfloor$.
+ \item For $i\in[0,t)$, set $\share{A''_i}:=\share A_i\bmod M$.
+ \item $(\share A^*,\share B^*):=
+ \uzip\bigl(\mathsf{Group\text{-}By}_{c,t,k}
+ (\share A',\share A''\zip\share B)\bigr)$,
+ using record group $\mathbb Z_M\times\mathbb G$.
+ \item For $j\in[0,k)$:
+ \begin{enumerate}
+  \item Invoke $\mathsf{DMPF}^j.\mathsf{Setup}(\share A_j^*\in[0,M)^c)$.
+  \item $\share z_j:=\mathsf{DMPF}^j.\mathsf{Expand}(\share B_j^*)$.
+ \end{enumerate}
+ \item For $j\in[0,k)$ and $x\in[0,M)$, set $\share y(jM+x):=\share z_j(x)$.
+ \item Return $\share y$.
+\end{enumerate}
+\end{minipage}}
+\caption{Bucketing with padded groups and one DMPF per bucket.
+\label{fig:bucketingDmpf}}
 \end{figure}
-
-
 
 \subsection{Group-By Operation}
 
-The \textsf{Group-By} protocol takes as input two secret-shared lists: a key vector $\share{A} \in [0,N)^t$ and a value vector $\share{B} \in \mathbb{G}^t$, as well as a padding parameter $p$. The protocol creates $N$ groups (one for each key in $[0,N)$), each padded to length $p$, so that no information about the true group sizes is leaked beyond the bound $p$.
+For keys $A\in[0,N)^t$, payload records $B\in\mathbb G^t$, and capacity $p$,
+Group-By returns $N$ groups of exactly $p$ records.
+When every key occurs at most $p$ times, group $i$ contains its input records
+and enough zero records to fill the group, in hidden random order.
 
-The protocol proceeds as follows:
+Let $f_i$ be the count of key $i$ as an integer in $[0,t]$.
+The count modulus is $2^\ell$ for $\ell:=\lceil\log_2(t+1)\rceil$;
+in particular, it represents the allowed boundary count $f_i=p$ without
+wrapping. For each key, create $p$ auxiliary records, of which
+$p-\min(f_i,p)$ have label $i$ and selection bit one.
+The others have label zero and selection bit zero.
+Append the real records, all with selection bit one, and shuffle.
+Opening the labels and selection bits identifies the groups, but not which
+selected records are real: selected padding records also have bit one.
+
+\begin{figure}[H]\small
+\centering
+\fbox{\begin{minipage}{.95\textwidth}
+Public parameters are $N,t,p\geq1$ and an additive record group $\mathbb G$.
+Put $\ell:=\lceil\log_2(t+1)\rceil$.\\
+$\mathsf{Group\text{-}By}_{p,t,N}
+ (\share A\in[0,N)^t,\share B\in\mathbb G^t)
+ \longrightarrow\share G\in(\mathbb G^p)^N$:\\[0.3em]
+The parties compute:
 \begin{enumerate}
-    \item For each $i \in [0,N)$, compute the frequency $\share{f_i}$ of key $i$ in $\share{A}$.
-    \item For each key $i$, construct a length-$p$ vector $\share{d_i}$ with $\share{f_i}$ zeros (for actual elements) and $p-\share{f_i}$ ones (for padding).
-    \item Form new arrays:
-    \begin{itemize}
-        \item Keys: Concatenate 
-        \begin{enumerate}
-            \item for each $i$, $\share{f_i}$ copies of $i$ and $p-\share{f_i}$ copies of 0.
-            \item the original keys in $\share{A}$. 
-        \end{enumerate}
-        \item Values: $0$ values for all padding positions, followed by the original values in $\share{B}$.
-        \item Indicator bits: $\share{d_i}$ for all keys, followed by $1$ for each actual data element.
-    \end{itemize}
-    Each new list has $Np+t$ elements.
-    \item Concatenate and randomly shuffle all tuples (key, value, indicator) so positions of actual and padded elements are hidden.
-    \item Reveal the key and indicator from each tuple to determine which are real (indicator $=1$) and which are padding.
-    \item For each key $i$, collect all real values (indicator $=1$, key $=i$) into group $G_i$ of size $p$.
-    \item Return the collection $(G_0,\ldots,G_{N-1})$ of padded groups.
+ \item $\share f:=\sum_{j\in[0,t)}\unitVec_{[0,N)}(\share A_j,1)
+       \in\mathbb Z_{2^\ell}^{[0,N)}$.
+ \item For $i\in[0,N)$, set
+ $\share{d_i}:=(0)^{\min(\share f_i,p)}\Vert
+               (1)^{p-\min(\share f_i,p)}$.
+ \item $\share A':=0\cdot\share d_0\Vert\cdots\Vert
+                  (N-1)\cdot\share d_{N-1}\Vert\share A$.
+ \item $\share B':=0^{Np}\Vert\share B$.
+ \item $\share d':=\share d_0\Vert\cdots\Vert\share d_{N-1}\Vert1^t$.
+ \item $(\share A',\share B',\share d'):=
+       \shuffle(\share A'\zip\share B'\zip\share d')$.
+ \item $(A',d'):=\mathsf{reveal}(\share A'\zip\share d')$.
+ \item For $i\in[0,N)$, let $\share G_i$ be the first $p$ records
+ $\share B'_j$ with $A'_j=i$ and $d'_j=1$.
+ \item Return $\share G$.
 \end{enumerate}
-
-Implementation costs for \textsf{Group-By} are dominated by the need to compute the (secret-shared) frequency of each key, $\share{f_i}$. This is accomplished using a unit vector indicator $\unitVec_{\mathbb{Z}_p^N}(\share{A_i},1)$ for each input element and key. This unit vector can be implemented either via a Distributed Point Function (DPF) evaluation or by a binary tree of AND gates. The same applies to constructing the new key array $\share{A'}$ in step 3, where a copy of each key is assigned based on the corresponding frequency counters. Thus, both the frequency counting and array construction can be realized efficiently using either primitive, with the overall cost scaling as $O(N t)$ for the binary tree approach or as $O(N t)$ using DPF-based techniques.
-
-
-\begin{figure}\hspace{-0cm}\small
-    \centering
-    \fbox{ \begin{minipage}{.95\textwidth}
-    For input and padding size $t,p \in \mathbb{N}$ and key domain $[0,N)$. \\
-    
-    $\textsf{Group-By}_{p,t,N}(\share{A}\in [0,N)^t,\share{B}\in \mathbb{G}^t)$:
-    \begin{enumerate}
-        \item let $\share{f}:=\sum_{i\in [t]}\unitVec_{\mathbb{Z}_{p}^N}(\share{A_i}, 1)$
-        \item for $i\in [0,N)$ let $\share{d_i}:=(0)^{\share{f_i}} || (1)^{p-\share{f_i}}\in \{0,1\}^p$
-        \item let $\share{A'} :=(0) \cdot \share{d_0} || ... || (N-1)\cdot \share{d_{N-1}} || \share{A} \in [0,N)^{Np+t}$
-        \item let $\share{B'} := (0)^{Np} || \share{B} \qquad \qquad \quad\in \mathbb{G}^{Np+t}$
-        \item let $\share{d'}  := \share{d_0} || ... || \share{d_{N-1}} || 1^{t} \ \,\in \{0,1\}^{Np+t}$
-        \item let $(\share{A'}\uzip\share{B'}\uzip\share{d'}) := \shuffle(\zip(\share{A'},\share{B'},\share{d'}))$
-        \item let $(A'\uzip d'):=\reveal(\zip(\share{A'},\share{d'}))$
-        \item for $i\in [0,N):$ let $\share{G_i}:=(\share{B'_j} \mid d'_j=1, A'_j =i )\in \mathbb{G}^p$
-        \item output $\share{G}$
-    \end{enumerate}
-    \end{minipage}}
-\caption{%
-Padded Group-By Protocol.\label{fig:PaddedGroupBy}
-}
+\end{minipage}}
+\caption{Padded Group-By. Selection bit one includes both input and padding
+records. Overflow is truncated rather than causing an explicit abort.
+\label{fig:PaddedGroupBy}}
 \end{figure}
 
+\paragraph{Correctness and opening distribution.}
+If $f_i\leq p$ for every key, each group has $f_i$ input records and
+$p-f_i$ selected zero records.
+Exactly $t$ auxiliary records are unselected.
+The opened pairs are therefore a uniform permutation of a fixed multiset:
+$p$ copies of $(i,1)$ for each $i\in[0,N)$, and $t$ copies of $(0,0)$.
+This describes the joint opening, not independent distributions for its
+two fields. In the ideal-shuffle hybrid, it hides the group sizes on the
+no-overflow event. Fresh output shares hide the retained payload records.
+On overflow, a group may have more than $p$ selected records; truncation
+keeps the output shape fixed, and the entire failed transcript is charged to
+the caller's overflow bound.
 
-
-\paragraph{Simulation.} Simulating this protocol is trivial assuming $A$ has maximum multiplicity of at most $p$. $A'$ is distributed as a random permutation of $((0)^p,...,(N-1)^p) || (0)^t$ and $d'$ is the same random permutation of $(1)^{Np}||(0)^t$. That is, $A'$ will have $p$ copies of each index along with $t$ additional copies of $0$. These additional copies of $0$ will have tag bit $d_i=0$ while all others have tag bit $d_i=1$. Simulation consists of uniformly sampling $A',d'$ from this distirbution.
+Frequency evaluation and construction of the auxiliary records require
+secret-index circuits. The explicit arrays already contain $Np+t$ records;
+a dense frequency implementation processes $Nt$ indicator entries.
+These costs must be included before comparing bucketing with another DMPF.

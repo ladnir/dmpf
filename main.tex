@@ -26,7 +26,6 @@
 \maketitle 
 
 \input{abstract}
-\textcolor{red}{move to peter's github...}
 
 \input{intro}
 \input{prelim}
@@ -35,9 +34,14 @@
 \input{DPF}
 \input{DMPF}
 
+\iffull
+\section{Core MPC Subroutines}
+\label{sec:subroutines}
+\input{subroutines}
+\fi
 
 \input{Cuckoo}
-\input{RevCuckoo}
+\input{WaterfallCuckoo}
 \iffull
 \input{Bucketing}
 \input{BigState}
@@ -45,12 +49,17 @@
 \input{OtherSummary}
 \fi
 \input{pcg}
+\input{RevCuckooSpecialized}
 \input{eval}
 
 
 \bibliographystyle{alpha}
 \bibliography{paper}
 \appendix
+
+\input{WaterfallCuckooAppendix}
+\input{RevCuckooHashAppendix}
+\input{ReusableDpfAppendix}
 
 \iffull
 \else

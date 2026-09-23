@@ -1,0 +1,271 @@
+\section{Correctness Analysis of the Reverse-Cuckoo Evaluator}
+\label{app:revCuckooHash}
+
+This appendix proves \namedref{Proposition}{prop:rc-ringlpn-correctness}.  The
+analysis is about consistency of the programmed binary systems.  It is
+independent of the Reverse-Cuckoo leakage assumption in
+\sectionref{sec:revCuckooDistribution}.
+
+\subsection{Caller distribution and shuffle factors}
+
+Use the notation of \equationref{eq:ringlpn-product-list}.  At the claimed
+Ring-LPN point,
+\[
+ N_{\mathsf R}=2^{20},
+ \qquad P=4,
+ \qquad t=16,
+ \qquad L=N_{\mathsf R}/t=2^{16}.
+\]
+The $P^2t=256$ triples $(a,b,k)$ produce 256 Reverse-Cuckoo sets.  Before
+deduplication, set $A_{a,b,k}$ contains the $t$ sums
+\[
+ X_{0,a,j}+X_{1,b,(k-j)\bmod t},
+ \qquad j\in[0,t).
+\]
+Before any support rejection, these points within one set are independent samples from the triangular
+distribution obtained by adding two uniform elements of $[0,L)$.  The DPF
+domain is $[0,2L)$, which we identify through binary encoding with
+$\mathcal X:=\F_2^{17}$.  Every point has probability at most
+$2/|\mathcal X|$.  Different sets share the underlying offsets and are
+therefore correlated.  The union bound below uses only expected relation
+counts; it does not assume independent failures across sets.
+
+Fix a relation of weight $k$.  Under a uniform shuffle into $w$ partitions of
+$d$ rows, the probability that all its points enter one partition is
+\begin{equation}\label{eq:rc-one-partition-prob}
+ p_{\mathsf{part}}(k)=\frac{w(d)_k}{(wd)_k},
+\end{equation}
+where $(a)_k=a(a-1)\cdots(a-k+1)$.  Conditioned on this event, its labels are a
+uniform $k$-subset of $\F_2^{\log_2d}$.  Let $p_0(d,k)$ be the probability that
+their XOR is zero.  A character sum gives
+\begin{equation}\label{eq:rc-zero-label-prob}
+ p_0(d,k)=
+ \begin{cases}
+  \displaystyle\frac1d, & k\text{ odd},\\[2mm]
+  \displaystyle\frac{\binom dk+(d-1)(-1)^{k/2}\binom{d/2}{k/2}}
+                         {d\binom dk}, & k\text{ even}.
+ \end{cases}
+\end{equation}
+The relation is harmful with the remaining probability $1-p_0(d,k)$.
+
+\subsection{Counting all degree-two relations}
+
+Only relations with $L_\alpha=0$ can disappear in the nonlinear lift.  For
+real points, the sentinel coordinate also implies that such a relation has
+even weight.  Let $B[k,s]$ denote the number of $k$-subsets of $\mathcal X$
+whose XOR is zero and whose quadratic moment has rank $2s$.  The rank-zero
+class consists of the weight-$k$ words in $\operatorname{RM}(2,17)^\perp$;
+the other classes retain nonzero quadratic moments.
+
+The refinement can be computed without enumerating point sets.  Let
+$K=\dim\operatorname{RM}(2,17)=1+17+\binom{17}{2}$, let $v_i$ be the number of
+alternating forms of rank $2i$, and let $P_{i,s}$ be the eigenmatrix of the
+binary alternating-forms association scheme.  If $T_{k,i}$ is the sum of the
+weight-$k$ Hamming Krawtchouk polynomial over the affine parts of a quadratic
+form of rank $2i$, then
+\begin{equation}\label{eq:rc-rank-enumerator}
+ B[k,s]=2^{-K}\sum_i v_iP_{i,s}T_{k,i}.
+\end{equation}
+We use the alternating-forms eigenmatrix of Delsarte and
+Goethals~\cite{delsarteGoethals1975}.  \equationref{eq:rc-rank-enumerator}
+specializes the MacWilliams transform while retaining quadratic rank; direct
+enumeration in dimensions three and four verifies the implementation of the
+transform.
+
+For any fixed $k$-subset, the probability that all its points occur among
+the $t$ samples is at most $(t)_k(2/|\mathcal X|)^k$.  Deduplication cannot increase the
+number of distinct relations.  The expected number of weight-$k$, rank-$2s$
+relations in the complete batch is therefore at most
+\begin{equation}\label{eq:rc-expected-relation-count}
+ P^2t\,(t)_k B[k,s]\left(\frac{2}{|\mathcal X|}\right)^k.
+\end{equation}
+For such a relation, the probability that the degree-two lift vanishes is
+\begin{equation}\label{eq:rc-lift-collapse}
+ a_{q'}(2s):=\left(\frac12+2^{-2s-1}\right)^{q'}.
+\end{equation}
+Combining \namedeqref{Equations}{eq:rc-one-partition-prob},
+\eqref{eq:rc-zero-label-prob}, \eqref{eq:rc-expected-relation-count}, and
+\eqref{eq:rc-lift-collapse}, then summing over $k\leq t$ and $s$, gives the
+structural failure bound
+\begin{equation}\label{eq:rc-structural-bound}
+ \epsilon_{\mathsf{str}}\leq
+ \sum_{k,s} P^2t\,(t)_k B[k,s]
+ \left(\frac{2}{|\mathcal X|}\right)^k
+ \frac{w(d)_k}{(wd)_k}
+ \bigl(1-p_0(d,k)\bigr)a_{q'}(2s).
+\end{equation}
+This sum includes deterministic degree-two identities: when $s=0$,
+$a_{q'}(0)=1$.
+
+For the numerical bounds, we sharpen the expected count of affine planes
+using the triangular distribution directly.  Write $p(x)$ for its mass at
+$x\in\mathcal X$, and define its Walsh transform by
+$\widehat p(u):=\sum_x p(x)(-1)^{u\cdot x}$.  The probability that four
+independent samples are distinct and have XOR zero is
+\[
+ \frac{1}{|\mathcal X|}\sum_u\widehat p(u)^4
+ -3\left(\sum_x p(x)^2\right)^2+2\sum_x p(x)^4.
+\]
+Multiplying by $P^2t\binom t4$ bounds their expected count.  The numerical
+structural sum also conservatively uses the full survival probability in
+\equationref{eq:rc-relation-survival} instead of only $a_{q'}(2s)$.
+This counts some final-compression events twice but preserves an upper bound.
+
+The largest terms for $w=2$, $d=16$, and the former intermediate width
+$q'=56$ are shown below.  Every omitted rank class contributes less than the
+last displayed row.
+\begin{table}[H]
+\centering
+\caption{Dominant structural terms at $q'=56$.}
+\label{tab:rc-hash-structural-terms}
+\begin{tabular}{c@{\qquad}c@{\qquad}c}
+\toprule
+Relation weight $k$ & Quadratic rank $2s$ & Batch contribution \\
+\midrule
+$4$  & $2$ & $2^{-39.469}$ \\
+$8$  & $0$ & $2^{-42.217}$ \\
+$6$  & $4$ & $2^{-46.993}$ \\
+$8$  & $6$ & $2^{-50.366}$ \\
+$10$ & $8$ & $2^{-52.928}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+The first row consists of affine planes.  A separate Walsh-transform
+calculation bounds their expected number before the shuffle by $3.791522$ and
+gives the same $2^{-39.469}$ contribution.  Rank-zero relations begin at
+weight eight and are affine three-cubes; their complete contribution is at
+most $2^{-42.217}$.  Thus deterministic degree-two identities are included,
+not excluded by a sampling heuristic.
+
+\subsection{Final compression and complete bound}
+
+Fix the supports, shuffle, and lifted rows in one partition containing $r$
+real rows.  Each nonzero lifted relation is killed by the independent uniform
+matrix $A_2$ with probability $2^{-q}$.  There are at most $2^r-1$ such
+relations, so their union contribution is less than $2^{r-q}$.  This argument
+does not require the lifted rows to be independent.
+
+Under a uniform shuffle, the number of real rows in one partition is
+hypergeometric before deduplication.  Deduplication can only reduce this
+number.  Averaging and taking a union bound over all sets and partitions gives
+\begin{equation}\label{eq:rc-compression-bound}
+ \epsilon_{\mathsf{cmp}}
+ <P^2tw\sum_{r=0}^{t}
+ \frac{\binom dr\binom{(w-1)d}{t-r}}{\binom{wd}{t}}\,2^{r-q}.
+\end{equation}
+The structural and compression events cover every nonzero row relation:
+either it vanishes in the lift, or a nonzero lifted relation is killed by
+$A_2$.  Hence
+$\epsilon_{\mathsf{batch}}\leq
+\epsilon_{\mathsf{str}}+\epsilon_{\mathsf{cmp}}$.
+
+\begin{table}[H]
+\centering
+\caption{Analytic correctness bounds before support rejection for the
+$N_{\mathsf R}=2^{20}$, $w=2$, $d=16$ Ring-LPN batch.
+Displayed exponents are rounded.}
+\label{tab:rc-hash-complete-bound}
+\begin{tabular}{c@{\qquad}c@{\qquad}c@{\qquad}c}
+\toprule
+$q'=q$ & Structural & Compression & Complete \\
+\midrule
+$56$ & $2^{-39.261}$ & $2^{-38.288}$ & $2^{-37.694}$ \\
+$64$ & $2^{-42.007}$ & $2^{-46.288}$ & $2^{-41.935}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+Substituting $d=16$ and $\lambda=40$ in
+\equationref{eq:rc-hash-widths} gives $q'=q=64$, proving the unfiltered
+clause of \namedref{Proposition}{prop:rc-ringlpn-correctness}.  For comparison, the same
+calculation for $w=3$, $d=8$ gives only $32.577$ bits at width $48$, but
+$40.194$ bits at the fixed-margin width $56$.
+
+The relation count also depends on the ring degree because
+$L=N_{\mathsf R}/t$ determines the point domain.  Applying the same analytic
+calculation to the three Ring-LPN benchmark sizes gives the following bounds.
+\begin{table}[H]
+\centering
+\caption{Dependence of the $q'=q=64$ proof on the Ring-LPN ring degree.}
+\label{tab:rc-hash-ring-size}
+\begin{tabular}{c@{\qquad}c@{\qquad}c@{\qquad}c}
+\toprule
+$N_{\mathsf R}$ & $L=N_{\mathsf R}/t$ & DPF domain & Complete bound \\
+\midrule
+$2^{16}$ & $2^{12}$ & $2^{13}$ & $2^{-26.218}$ \\
+$2^{18}$ & $2^{14}$ & $2^{15}$ & $2^{-34.213}$ \\
+$2^{20}$ & $2^{16}$ & $2^{17}$ & $2^{-41.935}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+At the two smaller ring degrees, rank-zero affine cubes dominate the bound.
+Their relations vanish in every degree-two feature lift.  Increasing the two
+evaluator widths therefore does not certify 40-bit correctness at those
+points; a stronger evaluator or a sharper caller-specific argument would be
+required.
+
+The proof assumes a uniform shuffle, ideal random matrices derived from the
+seed, uniform Ring-LPN block offsets, and semi-honest execution.  It does not
+analyze malicious bias in joint seed generation.  It also does not apply to
+the AnyField caller, whose point distribution must be counted separately.
+
+\subsection{Conditioning on the folded-support filter}
+\label{app:rc-hash-conditioning}
+
+The weak-factor filter changes the support distribution, so the preceding
+bound cannot be applied unchanged.  Each party independently resamples its
+four supports until their total folded support weight is at least 61.
+The weight counts occupied residues separately in each polynomial, before
+coefficient cancellation.  For party $p\in\{0,1\}$ and polynomial $a\in[0,P)$,
+define
+\[
+ D_{p,a}:=\left|\{(jL+X_{p,a,j})\bmod128:j\in[0,t)\}\right|,
+ \qquad
+ R_p:=\left\{\sum_{a\in[0,P)}D_{p,a}\ge61\right\}.
+\]
+The shuffle and evaluator seeds remain independent of this filter.
+Here $128$ divides $L$, so before rejection the $D_{p,a}$ are independent
+copies of the number $D$ of occupied bins after 16 uniform draws into 128 bins.
+
+Let $D_1,\ldots,D_4$ be independent copies of $D$, and put
+\[
+ \alpha:=\Pr[D_1+\cdots+D_4\ge61],
+ \qquad
+ \beta:=\Pr[D_1+D_2+D_3\ge45].
+\]
+These probabilities follow from an occupancy recurrence.  If $u_j(v)$ is
+the probability of $v$ occupied bins after $j$ draws, then $u_0(0)=1$ and
+\[
+ u_{j+1}(v)=\frac{v}{128}u_j(v)
+          +\frac{129-v}{128}u_j(v-1),
+\]
+with out-of-range entries zero.  Convolving $u_{16}$ gives
+$\alpha\approx0.5019144583$ and $\beta\approx0.7174085984$.
+
+Fix one polynomial's complete offset vector.  It has at most 16 occupied
+residues, so the probability that the other three polynomials complete
+acceptance is at most $\beta$.  Bayes' rule therefore bounds the density of
+this polynomial after local rejection by $\beta/\alpha$ times its original
+density.  The two parties reject independently.  Any nonnegative function
+of one polynomial from each party and independent setup coins consequently
+satisfies
+\begin{equation}\label{eq:rc-pair-conditioning}
+ \mathbb E[F\mid R_0\cap R_1]
+ \le \left(\frac{\beta}{\alpha}\right)^2\mathbb E[F].
+\end{equation}
+
+Every product list $A_{a,b,k}$ depends on just such a pair of polynomials.
+Apply \equationref{eq:rc-pair-conditioning} to each list's structural
+union contribution and sum over all lists.  This does not assume that
+different lists fail independently.  The final-compression bound is
+pointwise in the supports and therefore remains unchanged.  We obtain
+\begin{equation}\label{eq:rc-filtered-hash-bound}
+ \epsilon_{\mathsf{batch}\mid R_0\cap R_1}
+ \le \left(\frac{\beta}{\alpha}\right)^2\epsilon_{\mathsf{str}}
+     +\epsilon_{\mathsf{cmp}}
+ <4.739\cdot10^{-13}<2^{-40.940}.
+\end{equation}
+Here $(\beta/\alpha)^2\approx2.043025290$.  Thus the proposed support-only
+filter preserves 40-bit programmed-system correctness at the stated
+$2^{20}$ ring degree, without changing the evaluator widths.  This is a
+correctness bound, not a bound on descriptor leakage.  A filter that also
+tests coefficients, or a different rejection rule, requires its own analysis.

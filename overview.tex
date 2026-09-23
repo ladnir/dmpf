@@ -1,104 +1,106 @@
 \section{Technical Overview}
 
-This section formalizes our DMPF target, recalls the DPF subroutine we build on, and then presents the three constructions we implement—\emph{Cuckoo baseline}, \emph{Reverse Cuckoo}, and \emph{Bucketing}—together with the big-state keygen variants. We finish by detailing how these plug into Ring-LPN\cite{boyle2020efficient} and Stationary-LPN PCGs\cite{Stationary}.
+Our goal is to share a sparse map without revealing its indices.
+The parties first supply shares of at most $t$ addresses.
+Later, they supply new payloads for those same addresses.
+Each expansion returns shares of a length-$N$ map; duplicate addresses
+contribute their payload sum.
+A dummy address contributes nothing.
+The ideal functionality lets the corrupt party choose its output share;
+the honest party receives the complement to the specified map.
+The main cost is local expansion: a sum of $t$ independent DPFs traverses
+the full domain $t$ times.
 
-\paragraph{Target functionality and constraints.}
-Given secret-shared index-payload pairs $(\share{A_1},\ldots,\share{A_t})\in[0,N)^t$ and $(\share{B_1},\ldots,\share{B_t})\in\Group^t$, a Distributed Multi-Point Function (DMPF) outputs additive shares of
-\[
-  y \ =\ \sum_{i=1}^{t} \unitVec_{[0,N)}(A_i,B_i)\ \in\ \Group^{N},
-\]
-with \unitVec being defined to return a unit vector with value $B_i$ at index $A_i$.
-Note that we require correctness under collisions (``equal $A_i$ sum their $B_i$'') and with no leakage beyond what is inherent in the functionality. The efficiency goals are: near-linear $O(N)$ expansion work, $O(t\log N)$ communication for key-generation, and oblivious deduplication. 
+\paragraph{Sparse DPFs.}
+A single-point DPF uses a tree of pseudorandom seeds and public correction
+words to keep one secret path active. For a public subset $S\subseteq[0,N)$,
+our sparse DPF contracts paths with only one live child.
+It materializes only the leaves in $S$ and their branching nodes.
+Setup expands this compressed tree and saves the leaf seeds.
+Each later expansion converts those seeds using a round-indexed generator
+and applies a payload correction. It processes $|S|$ leaves rather than
+traversing the full ambient domain.
 
-\paragraph{DPF recap.}
-The simplest case of a Distributed Point Function\cite{dpf,dpf2,dpfKeygen} is when $t=1$: we want to share a unit vector of length $N$ with a single non-zero entry at position $\alpha$. Classical DPF constructions realize this using a binary tree of depth $\log N$. Each party holds a short seed, and by expanding a PRG level by level down the tree they generate all $N$ leaves. At each level, a small \emph{correction word} ensures that the parties' expansions remain consistent while only one path — the one leading to the secret index $\alpha$ — contributes a non-zero value $\beta$ at the leaf. All other leaves cancel to~0 when the two parties' outputs are added together. See \sectionref{sec:dpf}.
+\paragraph{The cuckoo layout.}
+A cuckoo-based DMPF gives each address one candidate bin in each of $w$
+partitions \cite{fssBatchCodes,cuckooDmpf}.
+Each bin owns the public sparse set of addresses that can map to it.
+If the secret input rows receive distinct admissible bins, one sparse DPF
+per bin suffices. Summing the bin outputs reconstructs the multi-point map.
+Each address appears once per partition, so expansion visits $wN$ leaves.
+The difficulty is finding the secret placement efficiently in MPC.
 
-\paragraph{Trivial baseline: sum of point functions.}
-The most straightforward way to realize a Distributed Multi-Point Function with $t$ active positions is simply to instantiate $t$ independent DPFs, one for each $(A_i,B_i)$. Each party receives $t$ short keys, and upon expansion they obtain $t$ length-$N$ vectors that are added together to form the final output:
-\[
-   y \ =\ \sum_{i=1}^{t} \mathsf{DPF}(A_i,B_i).
-\]
-This construction is functionally correct and requires no additional machinery. Its drawback is efficiency: expansion time, key size, and communication all scale linearly in $t$. Concretely, the work is $O(Nt)$, which is prohibitive in regimes where $N$ is large and $t$ grows with the security parameter or application size. Nonetheless, this ``trivial sum'' forms a useful conceptual baseline.
+\subsection{Waterfall Cuckoo DMPF}
 
+Waterfall first merges duplicate addresses and pads the list with dummies.
+It then samples public $t$-wise independent hashes before routing.
+Distinct real addresses have independent uniform candidates; dummy rows
+receive fresh uniform candidates.
+Consequently, the entire candidate matrix has the same distribution for
+every input support.
 
-\paragraph{New Sparse DPF}
-As a building block for our next construction, we generalize a basic $t=1$ DPF to a \emph{sparse DPF}. Here, the domain is restricted to a public subset $S\subseteq [0,N)$ of size $n$, and only leaves indexed by $S$ are materialized. Conceptually, the DPF still follows the same tree expansion, but it prunes away all irrelevant branches. The resulting expansion cost is $O(n)$ rather than $O(N)$, even when $N\gg n$. %This sparse variant is a key subroutine in our DMPF constructions, since each bucket or bin of the position matrix typically corresponds to a small valid set $S$ of candidate indices.
+An inexpensive scan fills the partitions in order.
+A row that collides remains unplaced and tries the next partition.
+A small public number of complete augmentations then repairs the remaining
+matching, followed by stash compaction.
 
-\paragraph{Cuckoo Baseline.}
-A natural way to extend from $t=1$ to $t>1$ is to try to ``pack'' the $t$ active positions into a small number of sub-instances of a DPF. This can be viewed as a concrete instantiation of earlier FSS-for-batch-codes ideas \cite{fssBatchCodes}, specialized to cuckoo hashing for efficiency \cite{cuckooDmpf}. Concretely, suppose we allow $w$ candidate hash functions $h_1,\ldots,h_w:[0,N)\rightarrow[m]$ and choose $m\approx(1+\varepsilon)t$ bins. Each input point $(A_i,B_i)$ is assigned to one bin by evaluating $h_j(A_i)$ for some $j\in[w]$. Each bin corresponds to a \emph{sub-DPF} whose domain is the set of positions that could hash there. Because these sets are much smaller than $[0,N)$, each sub-DPF can be realized as a \emph{sparse DPF} over its valid subset. The final DMPF output is obtained by expanding all $m$ sub-DPFs and summing their contributions into the global length-$N$ vector.
+Setup hides the resulting placement with two privately controlled permutation
+passes and opens only the permuted placement.
+On successful routing, that opening is a uniform labeled injection.
+It supports an oblivious scatter into the sparse-DPF columns.
+The simulation proof keeps the hashes unconditioned and charges routing
+failure once per setup state.
+It uses ideal MPC, permutation, and reusable-DPF functionalities;
+concrete realizations contribute their separate security losses.
 
-This design is attractive in theory: it reduces the number of leaves each DPF must cover, and with proper load balancing, the total work is nearly $O(N)$ rather than $O(Nt)$. The assignment step—choosing which $h_j$ each point uses—is exactly the same as building a cuckoo hash table\cite{cuckoo}, where each item has $w$ possible slots and we must find a consistent placement.
+At $t=16$, the default profile uses four 16-bin partitions and three repairs,
+with no stash. It has $4N$ local leaf expansion.
+The lower-expansion profile uses partition sizes $(128,128,64)$ and two
+repairs, also without a stash. It saves one domain traversal per expansion
+but has larger setup and state.
 
-The difficulty arises when the inputs $(A_i,B_i)$ are secret-shared. To maintain privacy, the parties must run the cuckoo hashing \emph{inside} MPC: for each element, evaluate its $w$ candidate positions, attempt insertion, and if a collision occurs, evict an existing item and try its next candidate slot. This iterative ``kick-out'' process is simple in the clear, but under MPC it requires a complex sequence of oblivious comparisons, swaps, and table updates. The depth of this procedure makes it expensive to implement securely, and the randomness of eviction cascades is particularly ill-suited to efficient circuit or OT-based MPC. We attempted to optimize this step but were not satified. 
+\subsection{Bucketing DMPF}
 
-For this reasons, although the cuckoo-baseline approach achieves the right asymptotics, in practice its distributed key-generation cost is dominated by the MPC required to realize cuckoo hashing and address translation. This motivates our alternative constructions that avoid iterative eviction entirely.
+For independent uniform input addresses, public intervals can divide the
+inputs into smaller padded groups. One DMPF handles each group.
+The tradeoff depends on the grouping circuit, the underlying DMPF, and an
+explicit overflow bound. Expansion must still materialize $N$ outputs.
 
+\subsection{Big-State DMPF}
 
-
-
-\subsection{Reverse Cuckoo DMPF (Main Construction)}
-
-The key idea of Reverse Cuckoo is to avoid the iterative ``kick-out'' process of normal cuckoo hashing. Instead of fixing hash functions and searching for a valid placement, we reverse the process: first assign each input to a bin, and then solve for hash functions consistent with that assignment. Let us warmup with the (insecure) case $w=1$. The construction proceeds in five steps:
-
-\begin{enumerate}[leftmargin=1.1em]
-  \item \textbf{Assign to bins.}  
-  Each input $(A_i,B_i)$ is padded and permuted into an array of length $m=(1+\varepsilon)t$. The resulting indices $A'_i$ represent the target bin assignment for each point. 
-
-  \item \textbf{Solve for hash functions.}  
-  We now construct hash functions that reproduce this assignment.  
-  \begin{enumerate}[label*=\alph*)]
-    \item Assign every position $j\in[0,N)$ a random binary feature vector $h_j\in\{0,1\}^q$.  
-    \item Collect the the ``active'' vector $h_{A_i}$  into a matrix $H$ and solve for a \emph{random} solution to the linear system
-      \[
-         H\cdot s \ =\ A',
-      \]
-      so that applying $s$ to $h_{A_i}$ yields the designated bin $A'_i$. This is done in MPC using our \textsf{bin-solver} protocol. The solution $s$ is secret-shared until the next step.
-  \end{enumerate}
-
-  \item \textbf{Reveal $s$.}  
-  Once a consistent solution is found, the parties reveal $s$. This makes the resulting hash family public, while inputs $A,B$ (hopefully) remain hidden.
-
-  \item \textbf{Compute the position map.}  
-  Using the revealed $s$, we define a public position matrix $P\in\{0,1\}^{N\times m}$ that maps each global index in $[0,N)$ to exactly one of the $m$ bins, i.e. $P_{j,i}=1$ means position $j\in [0,N)$ is mapped to bin $i\in[m]$.
-
-  \item \textbf{Sparse DPF instantiations.}  
-  Finally, for each bin $j\in[m]$, the parties run a \emph{sparse DPF} over the small domain $S_j=\{i\in[0,N): P_{i,j}=1\}$ with input $(\share{A'_j},\share{B'_j})$. The $m$ sparse vectors are then summed to produce the final output $y$.
-\end{enumerate}
-
-\paragraph{Security considerations.}
-The outline above—solving a single global system—would leak too much. In particular, revealing a single $s$ exposes correlations between all indices $A'_i$, leaking more than the ideal functionality. To repair this, we partition into $w$ independent systems, each of size $d=m/w$. Each block has its own feature matrix and solution $s_\ell$. Revealing $s_\ell$ gives only the hash family for that block, and the overall assignment is consistent with a valid cuckoo hashing placement except with the negligible cuckoo failure probability. Thus, for every revealed $s_\ell$, there exists a valid permutation of the inputs into bins, and the scheme inherits the standard security guarantees of cuckoo hashing in MPC.
-
-\paragraph{Costs and pipeline shape.}
-The Reverse Cuckoo setup consists of: (i) deduplication, (ii) $w$ linear solves on $d\times q$ binary matrices, (iii) computing the sparse sets $S_j$, and (iv) $m$ sparse DPF evaluations. Online expansion then requires only local DPF leaf work and vector summations, achieving essentially $O(N+\textsf{poly}(t))$. The critical property is that the $N$ terms is independent of $t$ and that the main keygen cost is solving a system for which we give an optimized construction. 
-
-
-\subsection{Bucketing DMPF (uniform-key regime)}
-When keys are uniform (or close), we show that one can partition the inputs into $k\approx t/\log t$ buckets of size $M=N/k$ so that Chernoff bounds keep per-bucket load to $O(\log t)$ w.h.p. We then run one DMPF per bucket over domain $M$ and concatenate. Both compute and communication are $O(t)$ overall (bucketing, grouping/reindexing, and concat are linear). This is particularly attractive as a black-box DMPF when uniformity (or light skew) holds. We formalize the \textsf{Group-By} subroutine (frequency counts $\share{f_i}$ and padded grouping) and its realizations via DPFs or binary AND-trees.
-
-\subsection{Big-State DMPF (two keygen paths)}
-In the big-state paradigm of Boyle et al. \cite{dmpf}, we give two key-generation methods: (1) a black-box route inspired by Reverse Cuckoo that reuses the linear-algebraic assignment to pre-compute the state structure, and (2) a very simple generic-MPC path leveraging AltMod-style PRGs to distribute the otherwise non-distributed keygen. Both aim to minimize distributed key-generation cost while preserving the asymptotic/structural benefits of big-state.
-
-
-
-
-
-
+The big-state approach \cite{dmpf} trades stored state for cheaper subsequent
+evaluation. We discuss a black-box key-generation path and a generic-MPC
+path for this setup--state tradeoff.
 
 \subsection{Integration into Ring-LPN and Stationary-LPN PCGs}
 
-\paragraph{Why DMPFs matter here.}
-To motivate our application domain, recall that the current status quo for Ring-LPN based PCGs is to fall back to the trivial ``sum of DPFs'' approach\cite{boyle2020efficient,foleage,anyField,pcgZ2k}. Concretely, generating $n$ correlations requires instantiating $t=O(\kappa)$ DPFs for each correlation, resulting in $O(n\cdot \kappa)$ calls to a PRF. This term dominates the runtime in existing implementations \cite{libOTe}, and represents the main efficiency barrier to scaling Ring-LPN PCGs.  
+A Ring-LPN PCG must share products of sparse polynomials.
+With $P$ polynomials per party and $t$ nonzero coefficients per polynomial,
+each cross-party product has $t^2$ terms before cancellation.
+For regular noise, one coefficient lies in each block of length
+$L=N_{\mathsf R}/t$.
+The products reorganize into $P^2t$ lists, each with $t$ terms and a
+local domain of length $2L$.
+Replacing a sum of $t$ DPFs on each list by a constant-expansion DMPF removes
+a factor of $t$ from the dominant leaf work.
 
-\paragraph{Where the $\kappa$ overhead comes from.}
-The extra factor of $\kappa$ is not an artifact of poor implementation but inherent to the structure of Ring-LPN. At a high level, we begin with $t=O(\kappa)$ sparse polynomials that define the error distribution. What we actually need to share are the supports of their product. Naïvely multiplying two $t$-sparse polynomials produces a $t^2$-sparse product. If we then apply ``regular noise''—the standard trick of spreading non-zeros more uniformly—we can reduce this back down by a factor of $t$, leaving an $O(Nt)$-sparse structure.  
+Stationary supports allow the address-dependent setup to be reused.
+Every expansion samples fresh coefficients and a fresh public mask vector.
+It converts cached leaves, communicates payload corrections, and performs
+ring arithmetic. Thus repeated expansion is not communication-free.
+Security across a polynomial number of expansions requires a joint
+stationary Ring-LPN assumption, separate from the routing argument.
 
-For OT and VOLE correlations, this regularization trick is enough to reach $O(N)$ complexity: the initial support size is $t$, and regular noise reduces the work by exactly a factor of $t$. In contrast, for Ring-LPN we start with $t^2$ non-zeros, so regular noise only shaves off one $t$, leaving us with $O(Nt)$ work. Thus the core bottleneck is the need to efficiently compress and share a \emph{multi-point} structure of size $t$ for each correlation.
+\subsection{Reverse Cuckoo}
 
-\paragraph{Our contribution.}
-This is exactly where our DMPF constructions enter. By providing an efficient, fully distributed way to realize a sparse multi-point function, we eliminate the need to instantiate $t$ independent DPFs per correlation \cite{boyle2020efficient,foleage,anyField,pcgZ2k}. In effect, our DMPFs collapse the $O(n\cdot \kappa)$ PRF calls of the naïve approach down to $O(n)$, finally putting Ring-LPN based PCGs on the same asymptotic footing as PCGs for OT and VOLE.
-
-\paragraph{Stationary LPN.}
-The advantage is even greater in the stationary-LPN regime \cite{Stationary}, where the support of the sparse error polynomials remains fixed across many expansions and only the coefficients change. Here the heavy distributed key-generation for the DMPF can be done once and amortized across arbitrarily many expansions. Each subsequent expansion then costs only $O(N)$ local PRG work, making the scheme extremely competitive in practice.
-
-\subsection{Complexity and Empirics (at a glance)}
-Reverse Cuckoo setup cost is: one \textsf{dedup}; $w$ linear solves over $d{\times}q$; sparse-set computation; and $m$ sparse-DPFs. Online expand is a handful of ms and stable across $n,t$; in measured runs, setup dominates (solve/sparse-sets/sparse-DPF roughly split the time budget), and median per-expansion throughput scales to multi-Mops/s across $n\in\{2^{16},2^{18},2^{20}\}$ and both 64-bit Goldilocks and 31-bit primes. Full tables and breakdown plots appear in \S\ref{sec:RevCuckooPerf} and \S\ref{sec:pcgPerm}. 
+For these random Ring-LPN supports, we also consider a placement-first
+construction. Reverse Cuckoo chooses a hidden placement, then programs
+public hashes compatible with it. This gives the $2N$ specialized pipeline
+evaluated in the paper.
+Its descriptors leak information about the support: in the ideal hash model,
+a hash tuple is weighted by its number of valid placements.
+Hidden permutations do not remove this multiplicity bias.
+We therefore use Reverse Cuckoo under an explicit leakage-robust decisional
+Ring-LPN assumption. The degree-two evaluator's correctness analysis is
+separate from that assumption. \sectionref{sec:revCuckoo} derives the leakage
+distribution and examines attacks that use it.

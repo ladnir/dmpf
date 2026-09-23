@@ -54,11 +54,13 @@ Next we will present the neccessary subprotocols before a formal description and
 
 
 \newcommand{\domain}{\left[0,N\right)}
-\begin{figure}[ht]\small
+\begin{figure}[H]\small
 	\centering
 	\fbox{ \begin{minipage}{.95\textwidth}
     
-     $\textsf{RevCuckoo}(\share{A}\in (\{0,1\}^{\log N})^t,\share{B}\in \mathbb{G}^t)$, party $p\in \{0,1\}$ computes:
+     $\textsf{RevCuckoo}(\share{A}\in (\{0,1\}^{\log N})^t,\share{B}\in \mathbb{G}^t)$.
+     \par\smallskip
+     Party $p\in \{0,1\}$ computes:
     
 \begin{enumerate}
 
@@ -99,106 +101,10 @@ Next we will present the neccessary subprotocols before a formal description and
     
 \end{enumerate}
     \end{minipage}}
-\caption{Reverse-Cuckoo Distributed multi-point function realizing \figureref{fig:dmpfFunc}.\label{fig:revCuckoo}
+\caption{Placement-first Reverse-Cuckoo distributed multi-point protocol.\label{fig:revCuckoo}
 } 
 \end{figure}
 
-
-\paragraph{The reverse-cuckoo leakage channel.}
-The revealed hash descriptors are not input-independent uniform strings, and
-the difference is not only a cuckoo-failure bit.  The following idealized
-calculation makes the leakage precise.  Fix a set $A$ of $t$ distinct active
-items, let $U$ be the distribution obtained by giving every item one
-independent uniform candidate in each of $w$ disjoint partitions of size $d$,
-and let $Z_A(h)$ be the number of injective placements of $A$ in the resulting
-cuckoo graph $h$.  A fixed injection into the $m=wd$ bins is compatible with
-$h\gets U$ with probability $d^{-t}$, and hence
-\[
-    \mathbb E_{h\gets U}[Z_A(h)] = \frac{(m)_t}{d^t}.
-\]
-Reverse cuckoo instead chooses a uniform injection first and programs the
-corresponding candidate of each item.  Summing over the injections compatible
-with a fixed $h$ gives the exact likelihood identity
-\begin{equation}\label{eq:rev-cuckoo-size-bias}
- \Pr[H=h\mid A]_{\mathsf{RC}}
-   = \Pr[H=h]_{U}\,
-     \frac{Z_A(h)}{\mathbb E_{U}[Z_A(H)]}.
-\end{equation}
-Thus the real distribution is size-biased by the \emph{number} of valid
-placements; it is not $U$ conditioned merely on $Z_A(h)>0$.  Its information
-density relative to the input-independent base $U$ is
-$\log_2 Z_A(h)-\log_2\mathbb E_U Z_A(H)$.  This observation invalidates the
-stronger claim that generic Reverse Cuckoo leaks only a negligible abort bit.
-
-Equation~\eqref{eq:rev-cuckoo-size-bias} describes the standard random-function
-model.  In the protocol, $h$ is represented by the revealed solutions to the
-Goldreich-feature linear systems.  Let
-$\mathsf{Leak}_{\mathsf{RC},N,t,w,d,B}(\mathcal A)$ denote the joint distribution of all public
-hash descriptors in a batch of $B$ Reverse-Cuckoo instances on support lists
-$\mathcal A$, including the shared fresh feature matrices used by the
-implementation.  The definition includes the feature-rank bad event.  On the
-event that every active feature submatrix has full row rank, randomized
-\textsf{bin-solver} samples uniformly from the required affine solution
-spaces; a zero or dependent active row is a proof-failure event, not a
-protocol abort.  Dummy rows are omitted from this rank requirement because
-$H_i(N)=0$ and \textsf{bin-solver} intentionally ignores them.
-
-\paragraph{Leakage-robust Ring-LPN assumption.}
-We use Reverse Cuckoo in the PCG only under the following explicit auxiliary
-leakage assumption.  Sample $e,f\gets\mathsf{HW}_{\mathbb R,t}$,
-$r,u\gets\mathbb R$, let $\mathcal A(e,f)$ contain every (possibly regularized
-or product) support list supplied to Reverse Cuckoo by the PCG, and sample
-$\Lambda\gets\mathsf{Leak}_{\mathsf{RC},N,t,w,d,B}(\mathcal A(e,f))$ jointly with those supports.
-We assume
-\begin{equation}\label{eq:ring-lpn-revcuckoo-leakage}
-  (r,\;r e+f,\;\Lambda)
-       \;\approx_c\;
-  (r,\;u,\;\Lambda).
-\end{equation}
-The batched version quantifies jointly over all sparse polynomials and all
-descriptors used in one PCG setup, rather than assuming that leakage from
-different sets is independent.  For Stationary LPN, the same $\Lambda$ and
-support are retained across the prescribed number of expansions while the
-coefficients and ring masks refresh.  This is a falsifiable strengthening of
-Ring-LPN/SSD with a fully specified, efficiently sampleable support-leakage
-channel; we do not claim a reduction from plain Ring-LPN.
-
-\paragraph{Security statement under leakage.}
-For arbitrary inputs, Reverse Cuckoo realizes a leakage-augmented DMPF
-functionality that outputs $\Lambda$ in addition to the DMPF output.  Given
-$\Lambda$, standard semi-honest simulators for \textsf{dedup},
-\textsf{bin-solver}, the permutation, and the sparse DPFs simulate the
-remaining transcript, up to their usual cryptographic errors and the active
-feature-rank bad event.  In the Ring-LPN and Stationary-LPN applications,
-Equation~\eqref{eq:ring-lpn-revcuckoo-leakage} then hides the sparse noise even
-given $\Lambda$.  Correctness is unconditional outside the rank bad event:
-the programmed candidate sends every active item to its distinct designated
-bin, after which the sparse DPFs sum to the requested multi-point function.
-
-\paragraph{Concrete cuckoo failure.}
-Failure of an input-independent table to admit a placement remains useful for
-quantifying how far one would need to move toward ordinary cuckoo security,
-but it is distinct from the size-bias leakage above.  Exact matching
-experiments at the implementation's current two-choice parameters $d=t$ give
-failure probabilities $0.0620,0.1005,0.1158$ for
-$t=16,64,128$, respectively; this load is at the two-choice threshold and the
-failure does not decay.  Enumerating all Hall witnesses gives conservative
-40-bit parameter bounds.  For a batch of $B=256$ sets (hence a per-set target
-$2^{-48}$), three choices with power-of-two partition sizes
-$d=128,256,256$ for $t=16,64,128$ give log-base-two batch failure bounds
-$-44.16,-44.71,-40.63$, respectively.  The corresponding two-choice sizes are
-$32768,65536,131072$ and are not practical.  These are placement-failure
-bounds only; Equation~\eqref{eq:ring-lpn-revcuckoo-leakage} is still required
-for the support leakage.  Allowing four choices gives a better finite-size
-tradeoff: $d=16,32,64$ for $t=16,64,128$ gives log-base-two batch bounds
-$-43.83,-49.08,-60.01$.  The simpler schedule $d=2t$ gives still larger
-margins $-59.90,-81.14,-92.02$, but is overprovisioned, particularly at
-$t=128$.  Since each extra choice adds another domain-sized partition pass,
-the best three-versus-four-choice point is ultimately a performance question.
-The current implementation supports only $w\in\{2,3\}$, derives $d$ directly
-from $(t,w)$, and does not use its \texttt{cuckooSecParam} argument; selecting
-these bounds therefore requires generalizing $w$ and exposing $d$ (or a
-validated failure target) in the initialization API.
 
 \iffull
 
@@ -236,6 +142,1818 @@ require cryptographic properties such as collision resistance; we require post-h
 genericity under fresh seeds sampled independently of the inputs. Our implementation uses an
 Goldrich PRG styled construction that is linear except for a small number of bitwise multiplications.  See \sectionref{sec:hash} for details.
 
+\fi
 
 
+\iffalse
+\section{Reverse-Cuckoo Leakage and Ring-LPN Analysis}
+\label{sec:revCuckooAnalysis}
+
+\paragraph{The reverse-cuckoo leakage channel.}
+The revealed hash descriptors are not input-independent uniform strings, and
+the difference is not only a cuckoo-failure bit.  The following idealized
+calculation makes the leakage precise.  Fix a set $A$ of $t$ distinct active
+items, let $U$ be the distribution obtained by giving every item one
+independent uniform candidate in each of $w$ disjoint partitions of size $d$,
+and let $Z_A(h)$ be the number of injective placements of $A$ in the resulting
+cuckoo graph $h$.  A fixed injection into the $m=wd$ bins is compatible with
+$h\gets U$ with probability $d^{-t}$, and hence
+\[
+    \mathbb E_{h\gets U}[Z_A(h)] = \frac{(m)_t}{d^t}.
+\]
+Reverse cuckoo instead chooses a uniform injection first and programs the
+corresponding candidate of each item.  Summing over the injections compatible
+with a fixed $h$ gives the exact likelihood identity
+\begin{equation}\label{eq:rev-cuckoo-size-bias}
+ \Pr[H=h\mid A]_{\mathsf{RC}}
+   = \Pr[H=h]_{U}\,
+     \frac{Z_A(h)}{\mathbb E_{U}[Z_A(H)]}.
+\end{equation}
+Thus the real distribution is size-biased by the \emph{number} of valid
+placements; it is not $U$ conditioned merely on $Z_A(h)>0$.  Its information
+density relative to the input-independent base $U$ is
+$\log_2 Z_A(h)-\log_2\mathbb E_U Z_A(H)$.  This observation invalidates the
+stronger claim that the placement-first protocol can be simulated by sampling
+$h\gets U$ with a loss bounded only by ordinary cuckoo failure.  It does not
+by itself rule out a different simulator; the pair-collision lower bound below
+does so for every input-independent simulator in the standard chosen-input
+game.  This still leaves a different question for the PCG application, where
+the relevant supports are random and hidden.
+
+\paragraph{An exact rejection identity.}
+\equationref{eq:rev-cuckoo-size-bias} also gives an exact alternative
+sampler for the placement-first distribution.  Sample $h\gets U$, choose
+$\sigma_u\gets[w]$ independently for every item, and accept precisely when
+the bins $(\sigma_u,h_{\sigma_u}(A_u))$ are pairwise distinct.  Conditional on
+$h$, the acceptance probability is $Z_A(h)/w^t$.  Therefore the accepted
+descriptor has distribution
+\[
+ \frac{U(h)Z_A(h)/w^t}
+      {\mathbb E_U[Z_A(H)]/w^t}
+ = \Pr[H=h\mid A]_{\mathsf{RC}},
+\]
+and the unconditional acceptance probability of one trial is
+\begin{equation}\label{eq:rev-cuckoo-rejection-probability}
+ p_{\mathsf{inj}}=
+ \frac{\mathbb E_U Z_A(H)}{w^t}
+ =\frac{(m)_t}{m^t}.
+\end{equation}
+After $R$ fresh trials the rejection probability is
+$(1-p_{\mathsf{inj}})^R$.  This is an exact sampler, rather than a statistical
+approximation, but it must evaluate the candidates on the complete list $A$.
+Consequently it is available to a simulator that is given $A$, but not to the
+standard simulator for one corrupt party, which receives only that party's
+input and output.
+
+\paragraph{Finite-proposal debiasing.}
+Suppose we draw $K$ independent Reverse-Cuckoo proposals and select proposal
+$i$ with probability proportional to a positive public score $a(D_i)$, where
+$D_i$ is its endpoint-occupancy deficit.  If $D_2,\ldots,D_K$ are independent
+deficits under the raw planted distribution, define
+\[
+ g_{K,t}(D):=K\,\mathbb E\left[
+   \frac{a(D)}{a(D)+\sum_{i=2}^K a(D_i)}
+ \right].
+\]
+The selected descriptor has the exact likelihood
+\begin{equation}\label{eq:rev-cuckoo-finite-k-channel}
+ \Pr[H=h\mid A]_K
+ =\Pr[H=h\mid A]_{\mathsf{RC}}\,g_{K,t}(D_A(h)).
+\end{equation}
+For the occupancy selector we take
+$a(D)=1/\mathbb E_U[Z_A(H)\mid D_A(H)=D]$; this table is computable offline
+from the occupied-bin recurrence.  \equationref{eq:rev-cuckoo-finite-k-channel}
+separates the soft and hard parts of the correction.  Since every score is
+positive, for every finite $K$,
+\[
+ \Pr[H=h\mid A]_K>0\quad\Longleftrightarrow\quad Z_A(h)>0.
+\]
+Thus finite $K$ reduces placement-multiplicity bias but does not change the
+matching-feasibility language.  Exact inverse-$Z$ selection approaches
+$U$ conditioned on $Z_A(H)>0$ as $K$ grows.  Occupancy selection need not:
+it can retain multiplicity variation among graphs with the same deficit.
+
+Small cuckoo failure alone cannot remove this distinction.  For example, let
+$t=2$ and $w=2$.  Under $U$, the two items have respectively zero, one, or two
+same-partition candidate collisions, giving $Z_A(H)=4,3,2$.  A placement
+always exists, yet a direct calculation gives
+\begin{equation}\label{eq:rev-cuckoo-two-item-distance}
+ \Delta(\mathsf{RC}(A),U)
+ =\frac{(d-1)^2}{d^2(2d-1)}
+ =\Theta(1/d).
+\end{equation}
+Thus no bound of the form
+$\Delta(\mathsf{RC}(A),U)\leq C\Pr_U[Z_A(H)=0]$ can hold for the
+placement-first distribution, even when $C$ is arbitrary.
+
+The obstruction is not limited to choosing $U$ as the simulated
+distribution.  There is an efficient test against every input-independent
+simulator.  For distinct addresses $x,y\in[N]$, define the public pair-
+collision statistic
+\[
+ C_{x,y}(h):=\sum_{s=1}^{w}\mathbf 1[h_s(x)=h_s(y)]\in[0,w].
+\]
+
+\medskip
+\noindent\textbf{Proposition (pair-collision lower bound).}
+Consider the ideal independent-choice Reverse-Cuckoo channel over a domain of
+size $N$, and suppose $N-1>w(wd-1)$.  Let $(X,Y)$ be a uniformly random
+ordered pair of distinct addresses, hidden from a simulator.  For every
+simulated public descriptor $\widetilde H$ independent of $(X,Y)$, the joint
+distributions $((X,Y),H_{\mathsf{RC}})$ and
+$((X,Y),\widetilde H)$ are efficiently distinguishable with advantage at
+least
+\begin{equation}\label{eq:pair-collision-simulation-lower-bound}
+ \eta_{N,w,d}
+ :=\frac{d-1}{wd}
+   \left(\frac{1}{wd-1}-\frac{w}{N-1}\right).
+\end{equation}
+In particular, when $N\gg w^2d$, this is
+$\eta_{N,w,d}=\Theta(1/(w^2d))$, independently of cuckoo failure.
+
+\begin{proof}
+Fix any descriptor $\widetilde h$ and let $n_{s,b}$ be the number of domain
+points mapped to bin $b$ by its side-$s$ function.  Convexity gives
+\[
+ \mathbb E_{X\ne Y}[C_{X,Y}(\widetilde h)]
+ =\frac{1}{N(N-1)}\sum_{s=1}^{w}\sum_{b=1}^{d}
+      n_{s,b}(n_{s,b}-1)
+ \geq \frac{w(N-d)}{d(N-1)}.
+\]
+The same lower bound holds after averaging over an arbitrary
+$\widetilde H$ independent of $(X,Y)$.
+
+In the Reverse-Cuckoo experiment, the programmed bins of the two planted
+items are a uniform ordered pair of distinct bins in $[w]\times[d]$.  For a
+fixed side $s$, both items are programmed on that side with probability
+$d(d-1)/(wd(wd-1))$; their side-$s$ outputs are then distinct.  In every other
+case the unprogrammed output or outputs are independent uniform elements of
+$[d]$, and collide with probability $1/d$.  Hence
+\[
+ \mathbb E[C_{X,Y}(H_{\mathsf{RC}})]
+ =\frac wd-\frac{d-1}{d(wd-1)}.
+\]
+Subtracting this value from the simulator lower bound gives
+$w\eta_{N,w,d}$.  A distinguisher computes $C_{X,Y}$ and outputs one with
+probability $C_{X,Y}/w$, obtaining advantage exactly the expectation gap
+divided by $w$.
+\end{proof}
+
+This experiment embeds directly into the usual one-corrupt-party DMPF game:
+fix the corrupt party's input shares, place $(X,Y)$ (and any remaining active
+addresses) in the honest shares, and use the functionality's uniformly random
+corrupt output share.  The simulator's prescribed input and output are then
+independent of $(X,Y)$, while the environment retains $(X,Y)$ and applies the
+test above.
+
+For the public linear descriptor used by the protocol, the same calculation
+holds on the event that the relevant feature rows have full rank: the
+unprogrammed evaluations are then independent uniform bin labels in
+$\mathbb F_2^k\cong[d]$, where $d=2^k$.  A rank-bad probability can only subtract that probability
+from the displayed advantage.  For example, at
+$N=2^{16},w=3,d=109$, \equationref{eq:pair-collision-simulation-lower-bound}
+is approximately $9.98\cdot10^{-4}>2^{-10}$, even though the rigorous
+per-set cuckoo-failure bound is below $2^{-50}$.  Thus the placement-first
+protocol cannot realize the ordinary DMPF functionality in the standard
+one-corrupt-party simulation model merely by enlarging the cuckoo table.
+
+\paragraph{Pairwise collision compensation.}
+The preceding distinguisher suggests a lightweight partial correction for
+three choices.  We first define an ideal compensation primitive, independently
+of its eventual MPC realization.  Write a global slot as $(s,b)\in[w]\times[d]$,
+where $s$ is a partition and $b$ is a local bin.  Let
+$\rho(i)=(S_i,B_i)$ be the slot assigned to active item $A_i$ by the hidden
+uniform injection.
+
+For every ordered pair of distinct partitions $(s,r)$, sample a public random
+partial matching $M_{s\mathbin\to r}$ on the $d$ slot positions in partition
+$s$.  Require every unordered pair of positions to belong to
+$M_{s\mathbin\to r}$ with probability
+\begin{equation}\label{eq:rev-cuckoo-compensation-q}
+ q:=\frac{1}{(w-1)(d-1)}.
+\end{equation}
+For even $d$, one may sample a uniform perfect matching and retain each edge
+with probability $1/(w-1)$.  For odd $d$ and $w\geq3$, sample a uniform
+near-perfect matching and retain each edge with probability
+$d/((w-1)(d-1))$.
+
+If a matched pair of positions contains two active items $A_i,A_j$, program
+an equality in the target partition,
+\begin{equation}\label{eq:rev-cuckoo-compensation-equality}
+ h_r(A_i)=h_r(A_j).
+\end{equation}
+All remaining evaluations are uniform subject to the planted values and these
+equalities.  Since $S_i=S_j=s\neq r$, the equality changes only unplanted
+candidates and leaves the original injection valid.  In an MPC realization,
+the matchings act on public row positions, while a secret active-row bit gates
+each equality.  Thus the shuffled permutation need not be recovered or
+opened; a fixed padded set of candidate equalities hides which matched rows
+contain active items.
+
+\medskip
+\noindent\textbf{Proposition (exact pairwise correction).}
+For every two distinct active items $A_i,A_j$ and every partition $r\in[w]$,
+the compensated channel satisfies
+\begin{equation}\label{eq:rev-cuckoo-compensated-pair-marginal}
+ \Pr[h_r(A_i)=h_r(A_j)]=\frac1d.
+\end{equation}
+Consequently, its expected partition-labelled collision count on the true
+support is exactly $\binom{t}{2}w/d$, as for independent uniform hashes.
+
+\begin{proof}
+Fix $i,j,r$, and put
+\[
+ \alpha:=\Pr[S_i=S_j=r]
+ =\frac{d(d-1)}{wd(wd-1)}
+ =\frac{d-1}{w(wd-1)}.
+\]
+If both items were planted in partition $r$, their planted bins are distinct,
+so their collision probability in $r$ is zero instead of $1/d$.  This removes
+$\alpha/d$ from the ordinary collision probability.
+
+For each $s\neq r$, the event $S_i=S_j=s$ also has probability $\alpha$.
+Conditioned on this event, the two source slots belong to
+$M_{s\mathbin\to r}$ with probability $q$.  Selecting the pair raises its
+collision probability in partition $r$ from $1/d$ to one.  Summing over the
+$w-1$ possible source partitions, the added probability is
+\[
+ (w-1)\alpha q\left(1-\frac1d\right)
+ = (w-1)\alpha\frac{1}{(w-1)(d-1)}\frac{d-1}{d}
+ =\frac{\alpha}{d}.
+\]
+This exactly cancels the planted-bin deficit.  In every other source-partition
+configuration the two evaluations in partition $r$ remain independent and
+uniform, so \equationref{eq:rev-cuckoo-compensated-pair-marginal} follows.
+Summing that identity over partitions and item pairs proves the collision-count
+claim.
+\end{proof}
+
+Pairwise correction is not full debiasing.  The first surviving term already
+appears on three active items.
+
+\medskip
+\noindent\textbf{Proposition (three-item residual).}
+Fix three distinct active items $A_i,A_j,A_k$ and a partition $r$.  Let
+\begin{equation}\label{eq:rev-cuckoo-compensated-beta}
+ \beta:=\Pr[S_i=S_j=S_k=r]=\frac{(d)_3}{(wd)_3}.
+\end{equation}
+Then the compensated channel satisfies
+\begin{equation}\label{eq:rev-cuckoo-compensated-triple-marginal}
+ \Pr[h_r(A_i)=h_r(A_j)=h_r(A_k)]
+ =\frac{1+2\beta}{d^2}.
+\end{equation}
+Independent uniform hashes give probability $1/d^2$, so the correction leaves
+an absolute excess $2\beta/d^2$.
+
+\begin{proof}
+Let $K$ be the number of the three items planted in partition $r$, and put
+$\alpha=(d)_2/(wd)_2$.  Without compensation, a triple collision in $r$ has
+probability $1/d^2$ when $K\leq1$ and is impossible when $K\geq2$.  Since
+\[
+ \Pr[K\geq2]=3\alpha-2\beta,
+\]
+the uncompensated contribution is $(1-3\alpha+2\beta)/d^2$.
+
+For $s\neq r$, let $n_s$ be the number of the three items planted in
+partition $s$.  The number of item pairs eligible for an equality from $s$ to
+$r$ is $\binom{n_s}{2}$.  Pair symmetry gives
+\[
+ \mathbb E\left[\sum_{s\neq r}\binom{n_s}{2}\right]
+ =3(w-1)\alpha.
+\]
+Because each $M_{s\mathbin\to r}$ is a matching, at most one internal pair of
+the three items is selected for each relevant source group.  Selecting such a
+pair raises the triple-collision probability from $1/d^2$ to $1/d$, an
+increment $(d-1)/d^2$.  The total compensation is therefore
+\[
+ q\,3(w-1)\alpha\frac{d-1}{d^2}=\frac{3\alpha}{d^2}.
+\]
+Adding the two contributions gives $(1+2\beta)/d^2$.
+\end{proof}
+
+At $w=3,d=93$, the residual for one fixed triple and one fixed partition is
+$2\beta/d^2\simeq8.38\cdot10^{-6}>2^{-16.87}$.  Thus the compensation removes
+the graph-density distinguisher exactly and lowers the first explicit residual
+by roughly seven bits, but it does not yet establish generic DMPF simulation.
+Higher-order collision compensation or a different argument is still needed.
+
+\paragraph{Canonical-witness debiasing for any number of choices.}
+The size bias has an exact reverse-only correction for every $w$.  In the
+joint placement-first experiment, let $\rho$ denote the planted injection.
+For every compatible pair $(h,\rho)$,
+\begin{equation}\label{eq:rev-cuckoo-joint-witness-density}
+ \Pr[H=h,\rho]
+ =U(h)\frac{d^t}{(wd)_t}.
+\end{equation}
+Indeed, $\rho$ is uniform among the $(wd)_t$ injections and conditioning the
+base descriptor on its $t$ programmed evaluations multiplies its density by
+$d^t$.  Thus, conditional on $h$, the planted $\rho$ is uniform among the
+$Z_A(h)$ valid placements.
+
+Fix any descriptor event $\mathcal G$, a public integer $c\geq1$, and a
+deterministic canonical ordering of the valid placements of every descriptor
+in $\mathcal G$.  Suppose $Z_A(h)\geq c$ throughout $\mathcal G$.  Generate a
+placement-first proposal and accept exactly when
+\begin{equation}\label{eq:rev-cuckoo-general-rank-test}
+ h\in\mathcal G
+ \quad\textnormal{and}\quad
+ \operatorname{rank}_h(\rho)<c.
+\end{equation}
+Exactly $c$ compatible witnesses are accepted for every $h\in\mathcal G$.
+\equationref{eq:rev-cuckoo-joint-witness-density} therefore gives
+\begin{equation}\label{eq:rev-cuckoo-general-debias}
+ Q_{\mathcal G}=U\mid\mathcal G,
+ \qquad
+ \Delta(Q_{\mathcal G},U)=\Pr_U[\mathcal G^c],
+ \qquad
+ \mathbb E[T]=\frac{\mathbb E_U Z_A(H)}
+                         {c\Pr_U[\mathcal G]}.
+\end{equation}
+In particular, for every $w$, taking
+$\mathcal G=\{Z_A(h)>0\}$ and $c=1$ gives standard simulation with loss
+exactly the ordinary cuckoo-failure probability and uses no LPN or
+syndrome-decoding assumption.  This statement is information theoretic and
+remains placement first.  Its generic expected proposal count can be as large
+as $w^t/(1-p_{\mathsf{cf}})$, however, and computing a canonical placement is
+a general matching problem.  The two-choice specialization below is useful
+because it takes exponentially larger $c$ and ranks placements using only the
+small collision core.
+
+The lift to the protocol's linear descriptors is also independent of $w$.
+Preprocess the complete secret graph
+$B=(b_{u,s})_{u\in[t],s\in[w]}$ together with its planted $\rho$, apply
+\equationref{eq:rev-cuckoo-general-rank-test}, and then solve
+$M_s(A)h_s=b_{*,s}$ independently for every $s\in[w]$.  If every $M_s(A)$ has
+full binary row rank and each solver samples a uniform affine preimage, every
+graph $B$ has the same number of coefficient-vector preimages.  Hence
+\equationref{eq:rev-cuckoo-general-debias} lifts unchanged to the revealed
+descriptors.  With the $t$-wise independent feature family described below,
+the canonical $c=1$ construction therefore satisfies, for a batch of $B_0$
+descriptors,
+\begin{equation}\label{eq:rev-cuckoo-general-security}
+ \operatorname{Adv}
+ <B_0p_{\mathsf{cf}}(t,w,d)
+   +wB_0 2^{t-q}+\epsilon_{\mathsf{MPC}}.
+\end{equation}
+For $q=t+64$, $w=3$, and $B_0=256$, the feature-rank term is below
+$3\cdot2^{-56}<2^{-54}$, so the concrete loss is still governed by the basic
+cuckoo-failure bound.
+
+\paragraph{A reverse-only debiasing transformation for two choices.}
+The obstruction above applies to the protocol as currently written, but the
+size-bias identity also gives a direct repair that preserves the
+placement-first structure.  Generate an ordinary Reverse-Cuckoo proposal
+$h$, keep both $h$ and the planted placement secret, and compute $Z_A(h)$
+inside MPC.  For a public threshold $c\geq1$, accept the proposal with
+probability
+\begin{equation}\label{eq:rev-cuckoo-debias-accept}
+ a_c(h):=\min\{1,c/Z_A(h)\}.
+\end{equation}
+Only the first accepted descriptor is revealed.  In particular, rejected
+descriptors must not be opened.  This is still Reverse Cuckoo: every proposal
+is generated from a planted injection, and no forward placement is computed.
+
+\medskip
+\noindent\textbf{Proposition (truncated inverse-count debiasing).}
+Fix a list $A$ of $t$ distinct addresses and let $U$ be the ideal two-choice
+base descriptor distribution.  Write $Z=Z_A(H)$ for $H\gets U$,
+$\mu=\mathbb E_U Z$, and
+\[
+ \beta_c:=\Pr_U[Z<c].
+\]
+The descriptor $Q_c$ output by the accepted experiment in
+\equationref{eq:rev-cuckoo-debias-accept} satisfies
+\begin{equation}\label{eq:rev-cuckoo-debias-distance}
+ \Pr[Q_c=h]
+ =\frac{U(h)\min\{Z_A(h),c\}}
+        {\mathbb E_U\min\{Z,c\}},
+ \qquad
+ \Delta(Q_c,U)\leq\frac{\beta_c}{1-\beta_c}.
+\end{equation}
+For an ideal two-choice graph, let
+\[
+ K:=2t-D_1-D_2,
+\]
+where $D_s$ is the number of distinct candidate bins occupied in partition
+$s$.  For every integer $r\in[2,t]$, setting $c=2^{t-r+1}$ gives
+\begin{equation}\label{eq:rev-cuckoo-debias-tail}
+ \beta_c
+ \leq p_{\mathsf{cf}}(t,2,d)+\Pr[K>r],
+ \qquad
+ \mathbb E[\textnormal{proposals}]
+ \leq\frac{2^{r-1}}{1-\beta_c}.
+\end{equation}
+
+\begin{proof}
+By \equationref{eq:rev-cuckoo-size-bias}, a proposal has density
+$U(h)Z_A(h)/\mu$.  Multiplication by $a_c(h)$ and normalization therefore
+gives the first identity in
+\equationref{eq:rev-cuckoo-debias-distance}.  Put
+$g(h)=\min\{Z_A(h),c\}/c$, $\alpha=\mathbb E_Ug$, and
+$\delta=1-\alpha$.  Since $0\leq g\leq1$ and $g=1$ when $Z\geq c$,
+$\delta\leq\beta_c$.  Consequently
+\[
+ \Delta(Q_c,U)
+ =\frac12\mathbb E_U\left|\frac{g}{\alpha}-1\right|
+ \leq\frac{\delta}{1-\delta}
+ \leq\frac{\beta_c}{1-\beta_c}.
+\]
+
+It remains to lower-bound $Z$ using $K$.  Regard the two candidates of every
+item as an edge of a bipartite multigraph.  A connected component with $e$
+edges and $v$ incident vertices is feasible exactly when $e\leq v$.  A tree
+component has $v=e+1$ and exactly $e+1$ placements, one for each unmatched
+vertex.  A unicyclic component has $v=e$ and exactly two placements, given by
+the two cyclic orientations; all attached tree edges are then forced.  Hence
+$Z$ is the product of these component contributions, while the component's
+contribution to $K$ is $e-1$ for a tree and $e$ for a unicyclic component.
+For completeness, isolated one-edge components contribute a factor two to
+$Z$ and zero to $K$.  If $K=1$, the only nontrivial component is a two-edge
+tree, so $Z=3\cdot2^{t-2}\geq2^{t-1}$.  If $K\geq2$, write the nontrivial tree
+sizes as $e_j\geq2$.  When there is a unicyclic component, its factor two,
+together with $e_j+1\geq2$ for every tree, gives
+$Z\geq2^{t-K+1}$.  When there are only trees, either there is one with
+$e_1-1=K\geq2$, giving $e_1+1\geq4$, or there are at least two, in which case
+$\prod_j(e_j+1)\geq3^a\geq2^{a+1}$ for their number $a\geq2$; again
+$Z\geq2^{t-K+1}$.  The case $K=0$ has $Z=2^t$.  Thus every feasible graph
+with $K\leq r$ and $r\geq2$ satisfies $Z\geq2^{t-r+1}$.  Therefore $Z<c$
+implies either cuckoo failure or $K>r$,
+which proves the first bound in
+\equationref{eq:rev-cuckoo-debias-tail}.
+
+Finally, the proposal acceptance probability is
+\[
+ \frac{\mathbb E_U\min\{Z,c\}}{\mu}
+ =\frac{c\alpha}{\mu}
+ \geq 2^{1-r}(1-\beta_c),
+\]
+because every two-choice graph has at most $2^t$ placements and hence
+$\mu\leq2^t$.
+\end{proof}
+
+For preprocessing we use a sharper cutoff form of this transformation.  Let
+\[
+ \mathcal G_r:=\{h:Z_A(h)>0\text{ and }K(h)\leq r\},
+ \qquad c=2^{t-r+1},
+\]
+and accept a Reverse-Cuckoo proposal with probability
+\begin{equation}\label{eq:rev-cuckoo-cutoff-accept}
+ a_r^{\mathsf{cut}}(h)
+ :=\mathbf 1[K(h)\leq r]\frac{c}{Z_A(h)}.
+\end{equation}
+The placement lower bound in the preceding proof ensures that this is a
+valid probability.  More importantly, the accepted density is exactly
+\begin{equation}\label{eq:rev-cuckoo-cutoff-distribution}
+ \Pr[Q_r^{\mathsf{cut}}=h]
+ =\frac{U(h)\mathbf 1[h\in\mathcal G_r]}{\Pr_U[\mathcal G_r]}.
+\end{equation}
+Thus, writing $\epsilon_r:=\Pr_U[\mathcal G_r^c]$,
+\begin{equation}\label{eq:rev-cuckoo-cutoff-distance}
+ \Delta(Q_r^{\mathsf{cut}},U)=\epsilon_r
+ \leq p_{\mathsf{cf}}(t,2,d)+\Pr[K>r],
+ \qquad
+ \mathbb E[\textnormal{proposals}]
+ \leq\frac{2^{r-1}}{1-\epsilon_r}.
+\end{equation}
+Unlike the truncated sampler, this form never computes $Z$ for a graph with
+$K>r$ and removes the normalization slack in
+\equationref{eq:rev-cuckoo-debias-distance}.
+
+The remaining occupancy tail is elementary and independent of $A$.  If
+$K_s=t-D_s$, then
+\begin{equation}\label{eq:rev-cuckoo-endpoint-occupancy}
+ \Pr[K_s=k]
+ =\frac{(d)_{t-k}}{d^t}
+   \genfrac\{\}{0pt}{}{t}{t-k},
+ \qquad
+ \Pr[K>r]
+ =\sum_{k_1+k_2>r}\Pr[K_1=k_1]\Pr[K_2=k_2],
+\end{equation}
+where the braced term is a Stirling number of the second kind.  Combining
+this exact tail with the rigorous Hall-witness bound gives the following
+proof-preserving two-choice points.  The partition sizes are the smallest
+implementation-supported powers of two at which the combined batch bound
+reaches $2^{-40}$.  This restriction also permits the exact
+$\mathbb F_2^k$ bin-label representation used below.
+
+\begin{center}
+\begin{tabular}{c|r|r|r|r|r|r}
+ $t$ & $d$ & $r$ & $\log_2 p_{\mathsf{cf}}$
+     & $\log_2\Pr[K>r]$ & $\log_2\Delta_{B=256}$
+     & proposals $\leq$ \\ \hline
+ 16  & 32768  & 6  & $-50.8684$ & $-64.7532$ & $-42.8683$ & 32 \\
+ 64  & 65536  & 8  & $-48.6481$ & $-55.8583$ & $-40.6384$ & 128 \\
+ 128 & 131072 & 10 & $-49.6135$ & $-59.3673$ & $-41.6118$ & 512
+\end{tabular}
+\end{center}
+Here $\Delta_{B=256}$ uses a union bound over 256 descriptors and omits only
+the separately accounted feature-rank and secure-subprotocol errors.  Thus
+the statistical simulation loss is essentially the ordinary cuckoo-failure
+bound: adding the cutoff tail multiplies the plain Hall-witness bound by only
+$1.00007$, $1.00676$, and $1.00116$ in the three rows, respectively.  No
+additional power-of-two table enlargement is needed relative to
+plain two-choice cuckoo security at the same target.
+
+\paragraph{Moving the correction entirely offline.}
+The proposal count in the table does not require repeated input-dependent
+linear solves.  A proposal can first be represented by its complete labeled
+candidate graph $B=(b_{u,s})_{u\in[t],s\in[2]}$.  Sample a uniform planted
+injection $\rho:[t]\hookrightarrow[2]\times[d]$; set the endpoint selected by
+$\rho(u)$ accordingly, and sample the other endpoint of item $u$ uniformly in
+$[d]$.  For every fixed graph $B$, exactly $Z(B)$ injections could have
+planted it, and hence
+\[
+ \Pr[B]=\frac{Z(B)}{(2d)_t d^t}
+       =\frac{U_{\mathsf G}(B)Z(B)}{\mathbb E_{U_{\mathsf G}}Z},
+\]
+where $U_{\mathsf G}$ is the uniform distribution on all $d^{2t}$ labeled
+two-choice graphs.  The parties can therefore generate secret shares of
+$(B,\rho)$ before any DMPF inputs exist.  Conditional on $B$, the planted
+injection $\rho$ is uniform among its $Z(B)$ valid placements.  Fix a
+deterministic canonical ordering of those placements and let
+$\operatorname{rank}_B(\rho)\in[0,Z(B))$ be the rank of $\rho$.  The exact
+cutoff test is
+\begin{equation}\label{eq:rev-cuckoo-rank-accept}
+ K(B)\leq r
+ \quad\textnormal{and}\quad
+ \operatorname{rank}_B(\rho)<c.
+\end{equation}
+On the first event the placement lower bound gives $Z(B)\geq c$, so exactly
+$c$ of the $Z(B)$ possible planted injections pass the second test.  Its
+conditional acceptance probability is therefore exactly $c/Z(B)$, realizing
+\equationref{eq:rev-cuckoo-cutoff-accept} without division or an additional
+random coin.  Only shares of the first accepted $(B,\rho)$ are retained;
+neither the graph nor its planted placement is opened.
+
+Online, let $M_s(A)$ be the $t\times q$ matrix whose $u$-th row is the
+feature vector $H_s(A_u)$.  Writing the $d=2^k$ bin labels as elements of
+$\mathbb F_2^k$, the parties perform one randomized solve per side,
+\begin{equation}\label{eq:rev-cuckoo-offline-graph-solve}
+ M_s(A)h_s=b_{*,s},\qquad
+ h_s\in(\mathbb F_2^k)^q,\quad b_{*,s}\in(\mathbb F_2^k)^t,\quad s\in[2],
+\end{equation}
+and reveal only the accepted solution vectors $h_s$.  Thus both candidate
+outputs of every item are programmed, rather than programming one endpoint
+and obtaining the other as a free evaluation.  The secret planted injection
+$\rho$ supplies the collision-free payload routing, so no matching or forward
+cuckoo insertion is performed.
+
+\medskip
+\noindent\textbf{Proposition (offline graph preprocessing realizes the
+debiased channel).}
+Let $d=2^k$ and identify the partition bins with $\mathbb F_2^k$.  Suppose
+each $M_s(A)$ has full row rank over $\mathbb F_2$ and the solver samples
+uniformly from every affine solution fiber in $(\mathbb F_2^k)^q$.  If the secret graph $B$ is
+sampled by the accepted preprocessing above, the public descriptor produced
+by \equationref{eq:rev-cuckoo-offline-graph-solve} has distribution
+$Q_r^{\mathsf{cut}}$ from
+\equationref{eq:rev-cuckoo-cutoff-distribution}.  Consequently it is
+simulated by independent uniform coefficient vectors with statistical loss
+exactly $\epsilon_r$ at the descriptor level, plus the feature-rank and
+secure-subprotocol errors.
+
+\begin{proof}
+Full binary row rank makes the componentwise map
+$M_s:(\mathbb F_2^k)^q\to(\mathbb F_2^k)^t$ surjective.  Thus, for uniform
+independent solution vectors $h_1,h_2$, surjectivity makes
+$B=(M_1h_1,M_2h_2)$ uniform over the labeled graph space, and every $B$ has
+the same number of preimages.  The cutoff preprocessing samples $B$ uniformly
+conditioned on $Z(B)>0$ and $K(B)\leq r$.  Sampling a uniform affine preimage
+therefore gives the solution-vector pair the uniform distribution conditioned
+on the corresponding event.  Its distance from an unconditioned uniform pair
+is precisely the probability $\epsilon_r$ of the complementary event, as in
+\equationref{eq:rev-cuckoo-cutoff-distance}.
+\end{proof}
+
+Equivalently, a binary right inverse $R_s$ satisfying $M_sR_s=I_t$ gives a
+preimage $R_sb$ for every vector of bin labels $b$, and every fiber has the
+same cardinality $d^{q-t}$.  This is exactly the characteristic-two algebra
+used by \textsf{bin-solver}; no lift to $\mathbb Z_{2^k}$ is needed.
+
+For a proof without a feature-rank conjecture, sample each
+$H_s:\mathcal X\to\mathbb F_2^q$ from a $t$-wise independent family after all
+input lists are committed.  One concrete family evaluates a uniformly random
+degree-$(t-1)$ polynomial over $\mathbb F_{2^q}$ at an injective encoding of
+$\mathcal X$ and writes the result in a binary basis; here
+$q\geq\log_2|\mathcal X|$.  For every fixed list of $t$ distinct labels, the
+rows of $M_s(A)$ are independent uniform vectors, so
+\begin{equation}\label{eq:rev-cuckoo-feature-rank}
+ \Pr[\operatorname{rank}M_s<t]
+ =1-\prod_{j=0}^{t-1}(1-2^{j-q})
+ \leq\sum_{j=0}^{t-1}2^{j-q}<2^{t-q}.
+\end{equation}
+Consequently, for two sides and $B_0$ possibly correlated lists fixed before
+the feature seeds, a union bound gives
+$\epsilon_{\mathsf{feat}}<B_0 2^{t-q+1}$.  Taking $q=t+\lambda$ suffices;
+$q$ need not grow with the much larger table partition $d$.  At
+$B_0=256$ and $\lambda=64$, this term is below $2^{-55}$.
+
+To preserve $t$ distinct feature rows after deduplication, this proof variant
+uses an extended label domain $\mathcal X$ and replaces repeated inputs by
+distinct zero-payload dummy labels with ordinary feature rows, rather than the
+current single dummy label satisfying $H_s(N)=0$.  The faster
+Goldreich-style feature family in the prototype can still be used, but then
+its stated worst-case feature-rank assumption replaces
+\equationref{eq:rev-cuckoo-feature-rank}.
+
+\medskip
+\noindent\textbf{Corollary (standard simulation of the debiased variant).}
+Consider the semi-honest Reverse-Cuckoo DMPF obtained by replacing the
+current shuffle-and-one-endpoint programming step with independent secret
+preprocessed pairs $(B,\rho)$ and
+\equationref{eq:rev-cuckoo-offline-graph-solve}.  Suppose the padded input
+list uses distinct feature labels, every full-list feature matrix is
+surjective, and all remaining MPC and sparse-DPF subprotocols satisfy their
+standard simulation definitions.  For a batch of $B_0$ descriptors, the
+view of either corrupt party is simulated without the honest party's input
+with distinguishing advantage at most
+\begin{equation}\label{eq:rev-cuckoo-debiased-security}
+ B_0\epsilon_r
+ +\epsilon_{\mathsf{feat}}+\epsilon_{\mathsf{MPC}}.
+\end{equation}
+This remains true for arbitrarily correlated or repeated support lists,
+provided an independent accepted graph is consumed for each descriptor.
+With the $t$-wise independent feature family above, the fully explicit bound
+is
+\begin{equation}\label{eq:rev-cuckoo-explicit-security}
+ \operatorname{Adv}
+ <B_0\left(
+ p_{\mathsf{cf}}(t,2,d)+\Pr[K>r]+2^{t-q+1}
+ \right)+\epsilon_{\mathsf{MPC}}.
+\end{equation}
+
+\begin{proof}
+Condition on the public feature seeds and on all required matrices being
+surjective.  Proposition~(offline graph preprocessing realizes the debiased
+channel) replaces each revealed coefficient-vector pair, one at a time, by
+an independent uniform pair at cost at most
+$\epsilon_r$.  This bound is uniform in the complete fixed input
+list, so the hybrid argument does not require the lists themselves to be
+independent.  The public position matrix and sparse sets are deterministic
+functions of these coefficient vectors.  Standard composition then simulates
+the secret graph shares, planted routing, linear solves, and sparse-DPF
+transcripts from the corrupt party's prescribed input and output.  Finally,
+remove the conditioning and add the feature-rank and subprotocol errors.
+\end{proof}
+
+Unlike \equationref{eq:ring-lpn-revcuckoo-leakage}, this is an ordinary
+DMPF simulation statement and uses no Ring-LPN or Stationary-SD assumption.
+For the three rows above, \equationref{eq:rev-cuckoo-debiased-security}
+contributes respectively at most
+$2^{-42.8683},2^{-40.6384},2^{-41.6118}$ from the entire batch of 256
+descriptors, before the separately selected feature-rank and subprotocol
+errors.
+
+The cutoff also makes this circuit substantially smaller than a generic graph
+algorithm on all $t$ edges.  Obliviously sort the $t$ endpoint records in each
+partition and count adjacent repetitions to obtain $K$.  If $K>r$, reject
+without computing $Z$.  Otherwise mark every edge having an endpoint in a
+non-singleton run and obliviously compact the marked edge identifiers.  Every
+edge of a nontrivial connected component is marked, and a tree component with
+$e\geq2$ edges contributes $e-1$ to $K$, while a unicyclic component
+contributes $e$.  Hence at most $2K\leq2r$ edges survive compaction.  A simple
+dense connectivity circuit on this collision core determines whether its
+components are trees or unicycles and computes their placement factors; if
+$\ell$ edges survive, the other $t-\ell$ isolated edges contribute the known
+factor $2^{t-\ell}$ to $Z$.  Using sorting networks, this gives a Boolean
+circuit of size
+\[
+ O(t\log^2t\log d+r^3+r^2\log d),
+\]
+rather than a cubic circuit in $t$.  The same component calculation gives an
+efficient canonical placement rank.  Order components deterministically.  An
+isolated edge contributes one binary orientation digit; a tree component with
+$e$ edges contributes the unmatched-vertex digit in radix $e+1$; and a
+unicyclic component contributes its cyclic-orientation bit.  Combining these
+digits in mixed radix yields $\operatorname{rank}_B(\rho)$ and implements
+\equationref{eq:rev-cuckoo-rank-accept} with no division, rejection coin, or
+rounding error.  All branching, compaction, and rank state remains secret.
+
+The outer proposal count need not be hidden.  If $p_{\mathsf{acc}}$ is the
+one-proposal acceptance probability, then for every accepted graph $b$ and
+attempt number $j$,
+\[
+ \Pr[T=j,B=b]
+ =(1-p_{\mathsf{acc}})^{j-1}\Pr[\textnormal{proposal }b]a_r^{\mathsf{cut}}(b)
+ =\Pr[T=j]\Pr[Q_r^{\mathsf{cut}}=b].
+\]
+Thus the geometric attempt number $T$ is independent of the retained graph
+and may be public, although the graph-dependent circuit and its internal rank-
+test transcript remain secret.  The loop terminates almost surely.  If an
+implementation instead caps it after $R$ proposals, the additional per-
+descriptor abort probability is at most
+\[
+ (1-p_{\mathsf{acc}})^R
+ \leq \exp\left(-R\,2^{1-r}(1-\epsilon_r)\right),
+\]
+which is added separately to the bound in
+\equationref{eq:rev-cuckoo-debiased-security}.
+
+The graph preprocessing is input independent, can be prepared as correlated
+preprocessing, and contains no operations on the large feature dimension.  An
+independent accepted graph is consumed for every descriptor; graphs are not
+reused across the batch.  The current
+prototype does not yet implement this variant.  Its small-table mode therefore
+continues to require the leakage assumption below.  The exact bounds and an
+exhaustive small-graph check are reproduced by
+\path{experiments/rev_cuckoo_debias.py}.
+
+\paragraph{Hidden-placement formulation.}
+It is important that the injection used to program a Reverse-Cuckoo
+descriptor is not revealed.  We formalize this distinction in the ideal
+random-function model.  Let $\mathcal V=[w]\times[d]$ be the partitioned bin
+set and, for a descriptor $h=(h_1,\ldots,h_w)$, define
+\[
+ \Gamma_h(\alpha):=\{(s,h_s(\alpha)):s\in[w]\}\subseteq\mathcal V.
+\]
+
+\medskip
+\noindent\textbf{Definition (hidden placements).}
+For every list $A=(A_0,\ldots,A_{t-1})$ of distinct active addresses, sample a uniform injection
+$\rho^\star:[t]\hookrightarrow\mathcal V$ and then sample $h$ from the
+independent random-function distribution conditioned on
+$\rho^\star(u)\in\Gamma_h(A_u)$ for every $u\in[t]$.  The channel outputs $h$
+but does not output $\rho^\star$.  For a batch of lists, the ideal channel
+performs these experiments independently and outputs only the descriptor
+batch $\Lambda=(h_\lambda)_\lambda$.
+
+The sampled $\rho^\star$ should not be confused with the public position
+matrix $P$: the row $P_\alpha$ contains all $w$ candidates
+$\Gamma_h(\alpha)$, whereas $\rho^\star$ selects one candidate for each
+active row.  Nor should it be confused with the auxiliary placement witnesses
+introduced next.  After $h$ is fixed, any of its $Z_A(h)$ compatible
+placements can serve as such a witness; it need not be the injection that was
+sampled while generating $h$.
+
+We now give a quadratic description of this hidden-placement channel for the
+product-support lists used by the PCG.  Condition on public offsets
+$X=(x_{a,u})$ and write the hidden regular offsets as
+$Y=(y_{b,j})$, where $y_{b,j}\in[L]$.  Introduce one-hot variables
+\[
+ z_{b,j,r}=\mathbf 1[y_{b,j}=r]
+ \quad\text{with}\quad
+ z_{b,j,r}^2-z_{b,j,r}=0,
+ \qquad \sum_{r\in[L]}z_{b,j,r}=1.
+ \tag{RC-S}
+\]
+For $\lambda=(a,b,k)$, item $u$ has address
+$x_{a,u}+y_{b,k-u}$, with the subscripts and address interpreted in their
+respective cyclic domains.  For a bin $v=(s,c)\in\mathcal V$, define the
+public linear polynomial
+\[
+ C_{\lambda,u,v}(z)
+ :=\sum_{\substack{r\in[L]:\\
+          h_{\lambda,s}(x_{a,u}+r)=c}}
+       z_{b,k-u,r}.
+ \tag{RC-I}
+\]
+On a one-hot assignment, $C_{\lambda,u,v}(z)$ is precisely the indicator that
+$v\in\Gamma_{h_\lambda}(x_{a,u}+y_{b,k-u})$.
+
+For every list $\lambda$, item $u$, and bin $v$, introduce an auxiliary
+Boolean variable $\rho_{\lambda,u,v}$.  Impose
+\begin{align}
+ \rho_{\lambda,u,v}^2-\rho_{\lambda,u,v}&=0,
+ &\sum_{v\in\mathcal V}\rho_{\lambda,u,v}&=1,
+ \tag{RC-M1}\label{eq:rc-matching-one}\\
+ \rho_{\lambda,u,v}(1-C_{\lambda,u,v}(z))&=0,
+ &\rho_{\lambda,u,v}\rho_{\lambda,u',v}&=0
+ \quad (u\ne u').
+ \tag{RC-M2}\label{eq:rc-matching-two}
+\end{align}
+The first line selects one bin for every item.  The second line requires the
+selected bin to be a candidate and prevents two items from selecting the same
+bin.  These are exactly the equations for a matching that saturates the item
+vertices of the ordinary cuckoo incidence graph.
+
+\medskip
+\noindent\textbf{Proposition (quadratic fibers give the Reverse-Cuckoo
+likelihood).}
+Fix $X$, a descriptor batch $h=(h_\lambda)_\lambda$, and a one-hot assignment
+$z$ corresponding to $Y=y$.  The number of assignments to the auxiliary
+variables $\rho$ satisfying
+\namedeqref{Equations}{eq:rc-matching-one}--\eqref{eq:rc-matching-two} is
+\[
+ \#\{\rho:F_{\mathsf{RC}}(X,y,h,\rho)=0\}
+   =\prod_\lambda Z_{A_\lambda(X,y)}(h_\lambda).
+ \tag{RC-F}\label{eq:rc-quadratic-fiber}
+\]
+Consequently, in the ideal independent-descriptor model,
+\[
+ \Pr[Y=y\mid X,h]
+ \ \propto
+ \Pr[Y=y\mid X]
+ \prod_\lambda Z_{A_\lambda(X,y)}(h_\lambda).
+ \tag{RC-P}\label{eq:rc-hidden-posterior}
+\]
+All equations in this formulation have degree at most two over any field in
+which the Boolean constraints are imposed.
+
+\begin{proof}
+For fixed $z$, \equationref{eq:rc-matching-one} chooses one bin for each
+item.  \equationref{eq:rc-matching-two} says that these bins are incident
+to their respective items and are pairwise distinct.  Thus the satisfying
+$\rho_\lambda$ assignments are in bijection with the injective placements
+counted by $Z_{A_\lambda(X,y)}(h_\lambda)$.  The witness variables for
+different lists are disjoint, giving the product in
+\equationref{eq:rc-quadratic-fiber}.  Marginalizing the unobserved sampled
+injections in the hidden-placement channel and applying
+\equationref{eq:rev-cuckoo-size-bias} gives
+\equationref{eq:rc-hidden-posterior}.  Finally,
+$C_{\lambda,u,v}$ is linear in the one-hot variables, so every displayed
+constraint has degree at most two.
+\end{proof}
+
+This formulation joins directly with a regular Ring-LPN or syndrome-decoding
+system.  At the coefficient-vector level, the public equation $s=re+f$ is
+$\boldsymbol{s}=M_r\boldsymbol{e}+\boldsymbol{f}$, where $M_r$ is the public
+circulant multiplication matrix.  If $\alpha_{b,j}$ is the nonzero value in a
+regular block, introduce expanded error variables $E_{b,j,r}$ and inverse
+witnesses $\beta_{b,j}$, and impose
+\[
+ E_{b,j,r}-\alpha_{b,j}z_{b,j,r}=0,
+ \qquad
+ \alpha_{b,j}\beta_{b,j}=1,
+ \tag{RC-LPN}
+\]
+together with the linear syndrome equations.  The inverse equation can be
+omitted when zero coefficients are allowed.  The resulting joint
+Ring-LPN--Reverse-Cuckoo system is quadratic.  For every fixed support and
+coefficient solution of the syndrome equations, its number of lifts into the
+matching variables is exactly the likelihood factor in
+\equationref{eq:rc-quadratic-fiber}.  Quadratic degree alone does not imply
+an efficient algebraic attack: the system contains a large one-hot support
+encoding, and eliminating the matching witnesses discards their fiber
+multiplicity and produces Hall-obstruction relations of increasing degree.
+
+\equationref{eq:rev-cuckoo-size-bias} describes the standard random-function
+model.  In the protocol, $h$ is represented by the revealed solutions to the
+Goldreich-feature linear systems.  Let
+$\mathsf{Leak}_{\mathsf{RC},N,t,w,d,B}(\mathcal A)$ denote the joint distribution of all public
+hash descriptors in a batch of $B$ Reverse-Cuckoo instances on support lists
+$\mathcal A$, including the shared fresh feature matrices used by the
+implementation.  The definition includes the feature-rank bad event.  On the
+event that every active feature submatrix has full row rank, randomized
+\textsf{bin-solver} samples uniformly from the required affine solution
+spaces; a zero or dependent active row is a proof-failure event, not a
+protocol abort.  Dummy rows are omitted from this rank requirement because
+$H_i(N)=0$ and \textsf{bin-solver} intentionally ignores them.
+
+We implemented an attack harness for this actual shared-feature channel.  It
+samples the Goldreich matrices with the implementation's byte-rounded widths,
+reuses one public feature root across the batch, and samples each revealed
+solution uniformly from its programmed affine fiber.  For reduced parameters
+it uses the exact rank-weighted likelihood of the public coefficient vectors.
+At the implementation-valid setting $P=2,t=3,d=4,L=8,K=4$, two independent
+runs found shared-minus-ideal joint-rectangle differences of $+0.008$ and
+$-0.004$ bit; marginal and pair-collision differences were also about one
+hundredth of a bit or less.  Thus the experiment detects no stable extra
+leakage from the shared root at this toy size.  At
+$P=2,t=d=4,L=6,K=4$, two further runs found joint differences of $+0.035$
+and $+0.005$ bit, again below the sampling resolution.  At
+$P=4,t=d=16,L=4096,K=4$, the current matching-aware
+rectangle attack still had only $1/256$ late conditional survival and no
+positive gain.  A production-shaped audit found no rank-deficient system among
+512 planted affine solves.  This is evidence against the tested local attack,
+not a pseudorandomness proof for the joint feature family.
+
+At the reduced $P=2,t=d=4,L=6$ point, the two-seed pooled exact joint gains
+for $K=1,2,4,8$ are $2.893$, $1.834$, $1.207$, and $0.810$ bits.  The gain
+removed by successive doublings therefore decreases from $1.059$ to $0.627$
+to $0.397$ bit, while the modeled total OT ratios are $1.00$, $1.35$, $1.73$,
+and $2.50$.  This makes $K=4$ a reduced-attack Pareto knee, not a security
+threshold.  The production matching-aware screen was also run for $K=1$ and
+$K=2$; like $K=4$, both selected rectangles collapsed to $1/256$ late
+survival.  The current production optimizer therefore cannot select $K$.
+
+Finally, we tested a full-batch conditional selector: posterior SMC particles
+supply contexts, and all values of each offset are scored by the product of
+all exact descriptor likelihoods before restricting the next block.  It
+matches the previous rectangle on exact toys, but both four- and sixteen-
+context production runs at raw $K=1$ have zero late survival under independent
+scoring.  This suggests that a single rectangular information set, rather than
+the factorwise approximation, is the present attack bottleneck.
+
+We also tested a charged portfolio of four mode-specific rectangles; it did
+not improve the exactly enumerable instances.  A non-rectangular follow-up
+restricts only one offset to an exact-width set $T\subseteq[L]$.  A posterior
+particle histogram selects $(i,T)$, and an independent SMC population estimates
+$p_T=\Pr[x_i\in T\mid\Lambda]$ by averaging exact full conditionals.  Its
+charged gain is
+\[
+  \log_2\left(\frac{p_T}{|T|/L}\right).
+\]
+The independent population is crucial: reusing a few training contexts and
+maximizing over all $tL$ singleton guesses produced spurious gains between
+seven and ten bits.  We discard those training-on-test estimates.  On the
+exact $P=2,t=3,d=4,L=8,K=1$ toy, a two-value set gives $0.365$ estimated bits
+versus $0.387$ exact bits.  At $P=4,t=d=16,L=4096$, a 256-value set has measured
+mass $0.0569$ for occupancy $K=4$, below its uniform baseline $1/16$, so the
+tested attacker falls back to zero gain.  The analogous $K=1$ experiment also
+has no positive holdout gain, but both independent samplers have minimum ESS
+below $0.09$ and land in different modes.  It is therefore inconclusive, not
+evidence that $K=1$ is safe.  These experiments retain $K=4$ only as an
+empirical cost/leakage knee; they do not establish a security threshold.
+
+\paragraph{Posterior support size.}
+The failure of a fixed-set decoder does not imply that the leakage is small.
+For a transcript $\Lambda$, write $W_\Lambda(x)$ for its likelihood under a
+uniform hidden offset vector $x\in[L]^t$.  The SMC normalizing constant and
+posterior particles estimate
+\[
+ D_{\rm KL}(p_\Lambda\|U)
+ =\mathbb E_{p_\Lambda}[\log_2 W_\Lambda]
+   -\log_2\mathbb E_U[W_\Lambda]
+\]
+and the collision-entropy loss
+\[
+ D_2(p_\Lambda\|U)
+ =\log_2\mathbb E_U[W_\Lambda^2]
+   -2\log_2\mathbb E_U[W_\Lambda].
+\]
+On an exactly enumerable $P=2,t=3,d=4,L=8,K=1$ instance, the SMC estimates
+the two losses as $0.300$ and $0.550$ bits, versus exact values $0.294$ and
+$0.547$ bits.  At $P=4,t=d=16,L=4096$, the prior offset entropy is 192 bits.
+Across two shared-Goldreich transcripts, the residual collision entropy is
+about 134--148 bits for $K=1$, 155--160 bits for $K=2$, and 161--165 bits for
+$K=4$.  With ideal hashes, the observed ranges are 130--134 bits for $K=1$
+and 149--154 bits for $K=2$.  Hence the large $K=1$ loss is inherent to
+Reverse Cuckoo rather than an artifact of the shared evaluator.  The posterior
+still has enormous effective support, but the worst observed ideal $K=1$
+margin over 128 bits is only about two bits.  Since the modeled amortized costs
+for $K=1,2,4$ are $1.00$, $1.37$, and $1.73$ times raw, $K=2$ is the present
+production cost/support knee.
+
+The collision measure formalizes only the leakage-only list heuristic.  If
+$H_2(p_\Lambda)$ is the posterior collision entropy, Cauchy--Schwarz gives
+\[
+ p_\Lambda(S)\leq\sqrt{|S|2^{-H_2(p_\Lambda)}}.
+\]
+Thus a list carrying mass $\epsilon$ has size at least
+$\epsilon^2 2^{H_2(p_\Lambda)}$.  This does not lower-bound an algebraic attack
+that combines $\Lambda$ with the LPN equations, so it is structural evidence,
+not a reduction to standard LPN.
+
+The preceding collision estimates use a posterior-particle moment and can
+under-sample rare high-weight modes.  We therefore continue SMC from target
+$W_\Lambda$ to $W_\Lambda^2$, introducing the second copy of each descriptor
+factor in four quarter-power steps.  On the exact toy this gives $0.553$ bit
+versus the exact Renyi-2 loss $0.547$.  At production size, two 1024-particle
+shared-$K=1$ continuations leave only $138.1$ and $131.5$ collision bits, while
+a lower-budget run reaches $127.7$.  Three shared-$K=2$ continuations across
+two transcripts leave $151.6$--$156.5$ bits and retain powered-stage minimum
+ESS above $0.90$.  Tempering the weaker ideal $t=18,K=1$ transcript leaves
+only $128.6$ bits after correcting to fixed $N=65536$.  Thus increasing the
+regular weight does not reliably substitute for finite-$K$ smoothing.  The
+current optimized point is $t=16,K=2$; $K=1$ remains highly sparse but has no
+credible 128-bit collision-entropy margin.
+
+\paragraph{Leakage-robust Ring-LPN assumption.}
+We use Reverse Cuckoo in the PCG only under the following explicit auxiliary
+leakage assumption.  Sample $e,f\gets\mathsf{HW}_{\mathbb R,t}$,
+$r,u\gets\mathbb R$, let $\mathcal A(e,f)$ contain every (possibly regularized
+or product) support list supplied to Reverse Cuckoo by the PCG, and sample
+$\Lambda\gets\mathsf{Leak}_{\mathsf{RC},N,t,w,d,B}(\mathcal A(e,f))$ jointly with those supports.
+We assume
+\begin{equation}\label{eq:ring-lpn-revcuckoo-leakage}
+  (r,\;r e+f,\;\Lambda)
+       \;\approx_c\;
+  (r,\;u,\;\Lambda).
+\end{equation}
+The batched version quantifies jointly over all sparse polynomials and all
+descriptors used in one PCG setup, rather than assuming that leakage from
+different sets is independent.  For Stationary LPN, the same $\Lambda$ and
+support are retained across the prescribed number of expansions while the
+coefficients and ring masks refresh.  This is a falsifiable strengthening of
+Ring-LPN/SSD with a fully specified, efficiently sampleable support-leakage
+channel; we do not claim a reduction from plain Ring-LPN.
+
+\paragraph{Security statement under leakage.}
+For arbitrary inputs, Reverse Cuckoo realizes a leakage-augmented DMPF
+functionality that outputs $\Lambda$ in addition to the DMPF output.  Given
+$\Lambda$, standard semi-honest simulators for \textsf{dedup},
+\textsf{bin-solver}, the permutation, and the sparse DPFs simulate the
+remaining transcript, up to their usual cryptographic errors and the active
+feature-rank bad event.  In the Ring-LPN and Stationary-LPN applications,
+\equationref{eq:ring-lpn-revcuckoo-leakage} then hides the sparse noise even
+given $\Lambda$.  Correctness is unconditional outside the rank bad event:
+the programmed candidate sends every active item to its distinct designated
+bin, after which the sparse DPFs sum to the requested multi-point function.
+
+\paragraph{Linear tests conditioned on leakage.}
+The linear-test theorem for stationary syndrome decoding gives a useful exact
+reformulation, but not a proof for our channel.  Divide the noise into $t$
+blocks of length $L$.  Let $S_j\in[L]$ be the stationary position in block
+$j$, and let every stationary instance have a fresh coefficient sampled from
+the full field at $S_j$.  After observing the public code matrices and
+$\Lambda$, a test chooses vectors $v_1,\ldots,v_q$.  A vector that is not a
+codeword leaves a uniform secret term and has zero bias.  Otherwise, define
+\[
+ T_j(v):=\{r\in[L]:v_i[j,r]\ne0\text{ for some }i\in[q]\}.
+\]
+For every nontrivial additive character, the conditional bias is exactly
+\begin{equation}\label{eq:rev-cuckoo-conditional-linear-bias}
+ \Pr[S_j\notin T_j(v)\text{ for every }j\mid\Lambda].
+\end{equation}
+Without $\Lambda$, the block positions are independent uniform values and a
+dual-distance-$d_\perp$ code family bounds this by
+$(1-d_\perp/N)^t$, recovering the SSD theorem~\cite{Stationary}.  With
+$\Lambda$, the test may adapt its codeword support to the correlated posterior,
+so that bound does not follow.  The missing claim is computational
+\emph{conditional dual avoidance}: given the code matrices and $\Lambda$, it
+is hard to find a nonzero codeword whose support avoids the hidden stationary
+support with noticeably enhanced probability.  Leakage-aware ISD is precisely
+such an adaptive test.  The reduced experiments below measure a rectangular
+version of this gain, including the selected-matrix rank event in the full
+attack metric.
+
+Fresh coefficients also explain why merely adding stationary instances does
+not improve a fixed test: any intersection in any active instance makes the
+character average zero.  This statement does not cover tests chosen after
+seeing the outputs.  In particular, SSD exhibits an output-span attack when
+the same generator matrix is reused across instances and emphasizes the need
+for a large, weakly correlated code family.  Our fresh ring masks are therefore
+security-critical; because their multiplication matrices are circulant rather
+than uniform, an analogous cross-expansion module attack must be ruled out
+separately.
+
+\paragraph{Leakage bits in the full Ring-LPN game.}
+The size-bias divergence of one support list is not itself the number of bits
+lost by Ring-LPN, and it must not be multiplied by the batch size.  To define
+the relevant full-game quantities, write $X=(e,f)$, $R=r$, $Y=re+f$, and let
+$\Lambda$ contain the complete joint batch of descriptors derived from $X$.
+The average information supplied to a decoder beyond the ordinary Ring-LPN
+instance is
+\[
+ k_{\mathsf{dec}}:=I(X;\Lambda\mid R,Y).
+\]
+The incremental KL evidence supplied to an unbounded decisional distinguisher
+is instead
+\[
+ k_{\mathsf{dist}}:=I(Y;\Lambda\mid R),
+\]
+because the chain rule gives the exact identity
+\[
+ D(P_{R,Y,\Lambda}\Vert P_R U_Y P_\Lambda)
+ =D(P_{R,Y}\Vert P_R U_Y)+I(Y;\Lambda\mid R).
+\]
+Since $R$ is independent of $(X,\Lambda)$ and $Y$ is determined by $(R,X)$,
+the total support information splits as
+\[
+ I(X;\Lambda)=k_{\mathsf{dist}}+k_{\mathsf{dec}}.
+\]
+These Shannon quantities give precise average ``leakage bit'' definitions but
+do not by themselves measure computational security loss.  Our concrete
+attack metric is the reduction in the base-two logarithm of the work of a
+leakage-aware decoder.  For the ideal independent-choice channel such a
+decoder weights a candidate $x$ by the product of placement counts
+$\prod_i Z_{A_i(x)}(h_i)$; the implementation experiment must instead retain
+the correlated support lists and shared feature matrices.  High information-
+density quantiles (or smooth max-information), rather than only the mean, are
+needed for a concrete security claim.  The exact reduced-game enumerators are
+provided in \path{experiments/rev_cuckoo_full_lpn.py} (binary unit
+coefficients) and \path{experiments/rev_cuckoo_full_lpn_field.py} (nonzero
+coefficients over a small prime field).  In the latter, $X=(e,f)$ contains two
+regular error polynomials, $R$ is uniform, and the enumerator conditions on
+the complete negacyclic syndrome $Y=Re+f$ before measuring descriptor-aided
+candidate ranking.  The refined channel forms all four sparse products with
+their actual nonzero coefficients, applies the negacyclic signs, deduplicates
+equal product addresses, and removes coefficient sums that cancel to zero.
+Across exact dimensions four and six, ordering regular support guesses by
+their exact ideal-channel likelihood reduces the expected guess-and-check
+rank by $0.296$--$0.560$ bits for raw $K=1$, $0.174$--$0.391$ bits for $K=2$,
+and $0.033$--$0.151$ bits for $K=4$.  These
+toys exhibit only a sub-bit exhaustive-search gain, but they are far too small
+to justify a production security estimate or rule out a more structured
+decoder.
+
+A follow-up basic $P=2$ regular-Prange experiment chooses $L/2$ columns from
+each of the $2t$ regular blocks of $[I\mid M_r]$ and retains the same
+coefficient-deduplicated leakage channel.  A polynomial-time pair-collision
+selector gives deterministic one-shot gains between $0.749$ and $1.345$ bits
+for raw $K=1$ at reduced $t=2,3,4$.  This is not directly a work factor,
+because repeating the same selected rectangle provides no new chance of
+success.  We therefore define a repeatable selector that samples every
+fixed-size block subset $C$ with probability proportional to
+$\prod_{i\in C}p_i^\beta$, where $p_i$ are the pair mean-field weights.  After
+optimizing $\beta$, its measured gain in work to reach $50\%$ success is only
+$0.08$--$0.20$ bits for $K=1$ and at most $0.06$ bits for $K=4$.  All selected
+matrices in the large-field rank audit were full rank.  This concrete reduced
+attack uses the leakage but does not presently show a material decoding loss;
+larger noise weights and better joint randomized selectors remain open in
+these reduced rows.
+
+A subsequent production-size experiment resolves the first of those open
+questions negatively.  It sorts the pair mean-field weights in each block,
+pairs the upper and lower halves, and samples exactly one coordinate from each
+pair, choosing weights $p_h,p_\ell$ with relative probability
+$p_h^\beta:p_\ell^\beta$.  This is a repeatable, polynomial-time regular
+Prange selector and becomes exactly uniform at $\beta=0$.  At fixed
+$N=tL=65536$, raw $K=1$ reduces average expected support-stage work by only
+$0.139$ bits at $(t,L)=(16,4096)$, but by $1.041$ bits at $(32,2048)$ and
+$14.987$ bits at $(64,1024)$, using fixed $\beta=.5$.  The corresponding
+$t=64$ estimates for $K=4,8,16$ are $10.024,10.879,7.261$ bits; the small
+$K=8$ reversal is within the four-to-six-instance sampling noise, while every
+recorded $t=64$ instance has positive gain at the more conservative fixed
+$\beta=.25$.  Basic $P=2$ regular Prange has support exponent $2t$, so the
+$t=16$ sub-bit result concerns only a 32-bit support exponent; it cannot be
+extrapolated to the $t=64$ point supplying 128 support bits.  Increasing the
+noise weight also increases the number and arity of leaked product
+constraints, and the current occupancy race with small constant $K$ does not
+offset that growth.  These production rows score support success before the
+selected-matrix rank event; all reduced large-field rank audits were full
+rank, but a production structured-rank audit remains required.  The complete
+per-instance results and driver are in
+\path{experiments/rev_cuckoo_basic_ring_lpn_isd_production.py} and the
+associated \texttt{production\_*.csv} files.
+
+The selector generalizes directly to arbitrary $P$: after sorting a block's
+beliefs, group ranks $i,i+L/P,\ldots,i+(P-1)L/P$ and choose one member with
+probability proportional to $p_j^\beta$.  It therefore keeps exactly $L/P$
+coordinates per block and at $\beta=0$ gives each coordinate inclusion
+probability $1/P$, recovering the exact support baseline $P^{-Pt}$.  Applying
+it to the implementation-shaped $P=4,t=16,L=4096$ point, whose support
+exponent is also 128 bits, gives expected-work gains of $0.609$ bits for raw
+$K=1$ and $0.257$ bits for $K=4$ at fixed $\beta=.5$ over six instances.  At
+the milder fixed $\beta=.25$ the gains are respectively $0.399$ and $0.168$
+bits.  Thus the current attack sharply favors obtaining the support exponent
+from more low-weight polynomials: the $P=4,t=16$ channel is substantially
+quieter than basic $P=2,t=64$ despite exposing 256 product descriptors.  This
+is evidence for, not a proof of, the $P=4$ setting; the sample is small, the
+full production rank event remains unproved, and stronger correlated decoders
+may exist.
+
+To test the independent-block approximation, we also implemented a
+correlated repeatable selector.  It samples blocks sequentially and updates
+each later block from the collision-label mass realized by the subsets
+selected so far.  A bootstrap particle filter evaluates the resulting
+$2^{-128}$ rare event without revealing the planted support to the attack.
+At fixed $\beta=.5$, this raises the six-instance expected-work gain from
+$0.609$ to $0.977$ bits for $K=1$, and from $0.257$ to approximately
+$0.37$--$0.40$ bits for $K=4$; the latter range accounts for visible particle
+noise in one instance.  Thus joint selection does use more leakage than the
+independent sampler, but the current correlated attack still finds a sub-bit
+loss for $K=4$.  It remains a pair-collision surrogate and does not yet
+propagate exact matching counts or Hall obstructions.
+
+We also tested a global matching-particle continuation.  It first samples the
+complete exact matching-likelihood posterior with SMC, then sequentially
+blends its conditional coordinate histograms into the same randomized,
+full-support information-set sampler.  Exact enumeration at
+$P=4,t=3,L=16$ finds no detectable improvement: for $K=4$ the pair-only and
+matching-guided expected-work gains are respectively $0.0755$ and $0.0752$
+bits.  On two production-shaped $P=4,t=16,L=4096,K=4$ instances, the
+pair-only log gains are $0.118,0.785$ bits, while the matching-guided gains are
+$-0.067,0.625$ bits.  Their two-instance expected-work aggregates are $0.413$
+and $0.237$ bits.  Minimum posterior-SMC ESS fractions are $0.263,0.303$ and
+minimum unique fractions are $0.188,0.215$.  Thus the exact matching guide is
+not a stronger attack in these tests, and the attacker falls back to the
+pair-only selector.  This does not exclude a non-Prange decoder that consumes
+whole matching witnesses or combines them directly with the Ring-LPN system.
+
+For raw $K=1$, uniform-prior posterior SMC collapses: on the same two seeds its
+minimum ESS fractions are $0.0063,0.0157$.  We therefore also sample the
+explicit attack distribution $q_{\rm pair}W_{\rm match}$ by initializing from
+the pair marginals and using pair-marginal Metropolis proposals.  This raises
+minimum ESS to $0.043,0.064$.  Pair-only one-instance gains are $0.573,1.447$
+bits, versus $0.512,1.492$ bits with matching guidance; the two-instance
+expected-work aggregates are $0.945$ and $0.920$ bits.  Thus the matching guide
+wins one instance and loses one, with no aggregate improvement.  Together
+with the exact reduced control, we find no evidence that conditional matching
+histograms strengthen the regular-Prange attack.  Whole-particle and
+equation-coupled decoders remain outside this conclusion.
+
+We therefore implemented a reduced equation-coupled four-list decoder.  It
+enumerates each polynomial's regular supports, orders Cartesian polynomial
+pairs by either pair-collision or exact matching likelihood, and joins the two
+sides on the complete prime-field Ring-LPN syndrome.  The exact selector
+recovers every planted solution and is strictly stronger than the pair
+surrogate.  After charging one operation for every descriptor-likelihood
+evaluation, its average expected-work gains are $1.773$ bits at
+$(t,L,K)=(3,8,1)$ and $0.652$ bits at $(3,8,4)$; paired bootstrap intervals are
+$[1.279,2.508]$ and $[0.287,1.082]$.  At $(t,L)=(4,4)$ the charged gains for
+$K=1,2,4,8$ are respectively $1.474,0.581,0.491,0.244$ bits, with the $K=8$
+interval including zero.  Thus exact matching structure is useful once the
+linear equation participates in list merging, although finite-$K$ selection
+strongly suppresses it.  This is not a production attack: constructing one
+polynomial list costs $L^t=2^{192}$ candidates at $t=16,L=4096$, and the
+reduced unit-coefficient prime-field model uses independent ideal descriptors.
+Scaling requires an inner Stern/Wagner or beam decoder that avoids complete
+per-polynomial enumeration.
+
+As a first scaling test, we replaced the $L^t$ enumeration by a blockwise
+beam.  Partial assignments are ranked by a monotone upper bound from the
+pair-collision surrogate; completed candidates are then reranked with the
+exact matching likelihood.  At the reduced point $(t,L)=(5,6)$, final list
+width 256, pair oversampling two, and beam width 512, an equal-success cost
+comparison against uniform lists gives charged gains of $5.80$, $3.10$, and
+$2.08$ bits for $K=1,4,8$, respectively.  Bootstrap intervals are
+$[5.12,6.29]$, $[2.17,3.73]$, and $[0.79,2.88]$.  This comparison charges
+generated beam children, complete likelihood factors, and two exhaustive
+outer pair lists.  It does not treat the fixed-instance search as independently
+restartable.  These data show that a bounded inner list can preserve the
+leakage signal, but remain far from a production attack: the four retention
+rates are combined under an independence approximation, the outer Ring-LPN
+join is modeled rather than executed, and the beam still costs roughly
+$tL$ times its width.  A global projected-syndrome Stern/Wagner search is the
+next concrete scaling test.
+
+We also implemented that first global projection test.  Pair syndromes are
+bucketed on $r$ public field coordinates; exact leakage masses are convolved
+over $\mathbb F_q^r$ by FFT, compatible buckets are searched in decreasing
+posterior mass, and candidates are finally joined on the complete syndrome.
+At $(t,L,q,r)=(4,4,17,2)$, the flat exact versus projected exact gains are
+$1.335$ versus $0.792$ bits for $K=1$, $0.385$ versus $0.195$ bits for $K=4$,
+and $0.057$ versus $-0.007$ bits for $K=8$.  Thus the projection does not
+improve the finer candidate-level best-first order.  Moreover, moving the
+projection inside the polynomial lists exposes a generic share-guessing loss:
+allocating $r$ syndrome coordinates among $P$ polynomials costs
+$q^{r(P-1)}$ share choices but filters each list by only $q^r$, for a net
+$q^{r(P-2)}$ penalty.  Pair-level allocation is work-neutral before leakage,
+and posterior bucket ordering did not change that conclusion.  A useful
+Stern/Wagner construction would therefore need additional representations or
+reuse across projection shares, rather than independent share guessing.
+
+\paragraph{Single-syndrome regular Stern.}
+We also instantiated the enumeration-based regular-ISD construction
+of~\cite{regularISD} directly on one field-valued Ring-LPN syndrome.  The
+ambient vector has $PtL$ coordinates, the parity-check matrix has $N=tL$
+rows, and the error has one unknown nonzero coefficient in each of $Pt$
+blocks of length $L$.  A regular information set $J$ contains
+$(P-1)N+\ell$ coordinates.  We distribute these coordinates integrally and
+as evenly as possible among the blocks, writing $v_b$ for the width in block
+$b$.  For even $p$, Stern requires $p/2$ planted errors in each fixed half of
+$J$.  The leaf list for a half $H$ has size
+\[
+ \mathcal L_H
+ =\sum_{\substack{S\subseteq H\\|S|=p/2}}
+   \prod_{b\in S}v_b(q-1),
+\]
+and matching on $\ell$ field equations leaves an expected
+$\mathcal L_0\mathcal L_1/q^\ell$ collisions.  The factor $q-1$ is essential:
+unlike binary regular noise, every selected error coefficient is unknown.  We
+charge the larger leaf list and collision list, but favor the attack by
+omitting polynomial matrix-elimination and memory costs.
+
+The leakage-aware selector supplies a planted-coordinate inclusion
+probability for each regular block.  Exact Poisson-binomial calculations give
+the probability that each half contains $p/2$ errors, and this iteration
+probability is combined with the full list cost.  At
+$(P,t,L,q)=(4,16,4096,65537)$, a search over even $p\leq8$ and
+$0\leq\ell\leq16$ always chooses $p=\ell=0$.  The resulting expected-work
+exponents are $127.123,127.360,127.841$ for occupancy channels
+$K=1,4,8$, respectively, versus the uniform regular-Prange exponent $128$.
+If we force $p>0$, the best row is $(p,\ell)=(2,3)$, with respective work
+exponents $146.526,146.788,147.262$; the uniform value is $147.419$.  Thus
+ordinary regular Stern is about $19.4$ bits slower than its $p=0$ specialization,
+and leakage does not close the gap.  This is a one-syndrome nonlinear attack,
+so the conclusion neither uses the stationary-SD linear-test theorem nor
+rules out representation-based MMT/BJMM variants.  Those variants require a
+separate $q$-ary representation-count analysis.
+
+\paragraph{$q$-ary MMT/BJMM representations.}
+We perform that analysis by extending the binary representation count
+of~\cite{regularISD}.  Let $W=Pt$ and consider a regular target of weight
+$a$ represented as the sum of two regular vectors of equal weight $b$.  If
+$s$ active coefficients are split between both addends and $u$ inactive
+blocks contain cancelling pairs, then $2b=a+s+2u$.  Summing every such
+decomposition gives
+\[
+ R_q(a,b)=
+ \sum_{\substack{0\leq s\leq a,\ 0\leq u\leq W-a\\
+                  2b=a+s+2u}}
+ \binom as(q-2)^s
+ \binom{a-s}{(a-s)/2}
+ \binom{W-a}{u}\bigl(v(q-1)\bigr)^u.
+\]
+Here a split active coefficient has $q-2$ choices, while a cancelling pair
+has $v(q-1)$ position--value choices.  For $q=2$, the $s>0$ terms vanish and
+the expression reduces to the binary regular-ISD formula.  Exhaustive
+enumeration over a small $q=3$ instance confirms the generalized count.
+
+We give the attack fractional filters
+$\ell_x=\log_qR_q(p,p_x)$ and, for the second level,
+$\ell_y=\log_qR_q(p_x,p_y)$, while omitting polynomial, elimination, and
+memory-access costs.  At $(P,t,L,q)=(4,16,4096,65537)$, exhaustive parameter
+search through $\ell=128$ finds the best nontrivial one-level MMT row at
+$(p,p_x,\ell)=(2,2,5)$ with work exponent $146.445$.  The best two-level BJMM
+row is $(p,p_x,p_y,\ell)=(2,3,2,6)$ with exponent $161.423$.  These compare
+with $147.419$ for ordinary Stern and $128$ for $p=0$ regular Prange.  MMT
+therefore recovers about one bit from Stern but remains 18.445 bits slower
+than Prange; the extra BJMM level is counterproductive.
+
+The MMT optimum is dominated by its $2^{32.585}$ leaf list, which contains one
+unknown position and one unknown nonzero field coefficient.  Repeating the
+full search while making the final merge free improves the optimum only from
+$146.4445$ to $146.4432$.  Thus a May--Ozerov acceleration of that merge cannot
+make this representation family competitive at these parameters.  Granting
+MMT the full $0.893$-bit leakage gain measured for the corresponding $p=2$
+Stern event would still leave about $2^{145.55}$ work for $K=1$, compared with
+$2^{127.12}$ for leakage-weighted $p=0$.  This closes the standard
+single-syndrome random-matrix Prange/Stern/MMT/BJMM progression, but not
+Ring-structure-aware or global matching-aware attacks.
+
+\paragraph{Sparse-factor reduction and projected leakage.}
+The random-matrix progression is not the controlling attack for our reducible
+ring.  Reducing modulo a sparse factor $X^n+a$ folds every exponent into its
+residue modulo $n$.  With $P$ regular error polynomials of weight $t$, the
+expected total reduced weight is
+\[
+ \bar w_n=Pn\bigl(1-(1-1/n)^t\bigr).
+\]
+For $(P,t,n)=(4,16,128)$ this gives $\bar w_n=60.383$, matching the
+$(c,w,i,w_i)=(4,64,7,60)$ parameter row of~\cite{boyle2020efficient}.  The
+corresponding conservative statistical-decoding estimate is
+\[
+ n\left(\frac{Pn}{n-1}\right)^{\bar w_n}=2^{128.450}.
+\]
+Thus the principal structured attack works on a length-$512$, degree-$128$
+instance rather than the original $65536$-row matrix.
+
+The reduced code has length $Pn=512$, dimension $(P-1)n=384$, and dual
+dimension $n=128$.  Any set $Z$ of 127 desired zero coordinates is realizable
+by a nonzero dual codeword, since it imposes only 127 homogeneous constraints
+on that dual space.  If the reduced error support $T$ lies in $Z$, the check is
+noiseless.  Thus global zero-set selection is a concrete statistical-decoding
+attack under the favorable precomputation assumption of
+\cite{boyle2020efficient}.
+
+We project each pair-collision block belief by
+$x\mapsto(jL+x)\bmod128$ and let $s_j$ be the resulting occupancy score on
+each of the 512 reduced coordinates.  The attack samples a global 127-subset
+with $\Pr_\beta[Z]\propto\prod_{j\in Z}s_j^\beta$.  Its exact planted-support
+containment probability is
+\[
+ \frac{\left(\prod_{j\in T}s_j^\beta\right)
+ e_{127-|T|}((s_j^\beta)_{j\notin T})}
+ {e_{127}((s_j^\beta)_{j\in[512]})}.
+\]
+Four production trials for each channel choose $\beta=0$.  For $K=1$,
+$\beta=1$ loses $0.022$ bit in per-instance work and $0.052$ bit in average
+signal; for $K=4$ it loses $0.015$ and $0.016$ bit.  At $\beta=8$ the
+respective signal losses are $0.456$ and $0.151$ bit.  Every positive-$\beta$
+comparison is negative in all eight paired trials.  Hence the tested
+Reverse-Cuckoo signal does not survive factor reduction in a form useful to
+this directly realizable global dual-check selector.  Exploiting the leakage
+would require preserving higher-order matching information through the
+reduction, rather than reweighting individual reduced coordinates.
+
+We also test this residual direction directly at the highest-leakage $K=1$
+point.  Starting from the pair marginals, an SMC sampler applies every complete
+Reverse-Cuckoo matching likelihood and targets the aggressively
+leakage-weighted heuristic distribution $q_{\rm pair}W_{\rm match}$; this is
+not claimed to be an exact posterior.  One selector
+blends the particles' reduced-coordinate occupancy marginals into the scores
+$s_j$.  A second, joint selector plants the complete reduced support $U$ of
+one particle for each error polynomial and fills the remainder of $Z$
+uniformly.  Conditional on $U$, its exact success probability is
+\[
+ \frac{\binom{512-|U|-|T\setminus U|}
+                   {127-|U|-|T\setminus U|}}
+      {\binom{512-|U|}{127-|U|}},
+\]
+which we average exactly over the particle populations.
+
+In two production trials with 128 particles and two mutation moves per factor,
+the uniform selector costs $145.975$ bits on the sampled weights.  Planting
+pair-marginal supports costs $151.262$ bits, a $5.286$-bit loss; planting
+complete matching-particle supports costs $180.923$ bits, a $34.948$-bit
+loss.  The marginal selector again chooses zero guidance over mixes
+$0,.25,.5,.75$ and $\beta=0,.25,.5,1,2,4,8$; even
+$(\mathrm{mix},\beta)=(.25,.25)$ loses $0.252$ bit.  This is negative evidence,
+not a proof: the minimum SMC ESS and unique-particle fractions are only
+$0.0255$ and $0.0234$, so a better Hall- or matching-aware decoder remains
+unexcluded.  However, neither exact-factor residue marginals nor complete
+particle supports yield a measured attack gain.  The experiment is in
+\path{experiments/rev_cuckoo_ring_lpn_factor_matching.py}.
+
+For fixed reduced weight $W$, the exact uniform attack costs
+\[
+ n\,\frac{\binom{Pn}{n-1}}{\binom{Pn-W}{n-1-W}}.
+\]
+At $W=60$ this is $2^{146.774}$, versus $2^{127.679}$ from the published
+independent-coordinate lower bound.  The latter is deliberately conservative
+for the attacker and is loose here because $W/n$ is not small.
+
+The reduction also exposes a separate implementation requirement.  The
+Ring-LPN analysis rejects noise whose weight modulo the smallest relevant
+sparse factor falls below its expectation.  Our current implementation samples
+the 64 regular positions once without this test.  The exact occupancy law has
+\[
+ \Pr[W<\lceil\bar w_{128}\rceil]=\Pr[W<61]=0.498086.
+\]
+Averaging the published lower bound over this unconditioned tail gives
+$122.482$ bits, rising to $130.572$ bits after conditioning.  The corresponding
+exact hypergeometric dual-check exponents are $136.431$ and $150.526$ bits.
+Both calculations show the importance of removing the weak tail.  The filter
+accepts with probability $0.501914$, requiring only $1.992$ samples on average.
+This roughly one-bit entropy loss is independent of Reverse Cuckoo and should
+be enforced by locally resampling supports before DPF construction.  The
+experiment and deterministic checks are in
+\path{experiments/rev_cuckoo_ring_lpn_factor_attack.py}.
+
+A scaled structured-rank audit nevertheless finds no rank penalty
+from leakage guidance.  At $P=4,t=16,L=16$, the full-rank counts for uniform,
+stratified-$\beta=0$, and guided-$\beta=.5$ selections are respectively
+$371,387,375$ out of 400 over $\mathbb F_{17}$; $997,996,998$ out of 1000 over
+$\mathbb F_{257}$; and $400,400,400$ out of 400 over
+$\mathbb F_{65537}$.  At $L=32$ over $\mathbb F_{257}$ they are
+$99,100,100$ out of 100.  Every observed failure has deficiency one.  The
+rank-ratio correction is therefore empirically at most a few hundredths of a
+bit and does not discount the measured support gain.  Sampling with the
+sequential selector gives uniform/stratified/guided/sequential full-rank
+counts of $499/498/499/498$ out of 500 over $\mathbb F_{257}$ and
+$381/372/375/381$ out of 400 over $\mathbb F_{17}$, with deficiency one in
+every failure.  A
+nonvanishing-minor proof or production black-box rank test remains open.
+
+\paragraph{Concrete negligible-failure parameters.}
+Failure of an input-independent table to admit a placement is a useful proxy
+for how far one must move toward ordinary cuckoo security, although it is
+distinct from the size-bias leakage in
+\equationref{eq:rev-cuckoo-size-bias}.  At the implementation's current
+two-choice parameters $d=t$, exact matching experiments give failure
+probabilities $0.0620,0.1005,0.1158$ for $t=16,64,128$, respectively.  This is
+the two-choice threshold, so the failure does not decay.  The ultimate
+two-choice tail is proportional to $\binom{t}{3}/d^4$; reaching a per-set
+failure of $2^{-48}$ would require approximate partition sizes
+$19926,58520,99008$, which are not practical.
+
+For three choices we can avoid tail extrapolation entirely.  Hall's theorem
+says that placement fails only if some $k$ items collectively see at most
+$k-1$ bins.  If their neighborhood contains $r_s\geq1$ bins in partition $s$,
+a union bound over the item set and the partition neighborhoods gives
+\begin{equation}\label{eq:partitioned-hall-bound}
+ p_{\mathsf{cf}}(t,w,d)
+ \leq
+ \sum_{k=w+1}^{t}\binom tk
+ \sum_{\substack{r_1,\ldots,r_w\geq1\\
+                  r_1+\cdots+r_w\leq k-1}}
+ \prod_{s=1}^{w}
+   \binom d{r_s}\left(\frac{r_s}{d}\right)^k .
+\end{equation}
+Indeed, after fixing the $k$ items and $r_s$ bins in each partition, the
+probability that all $k$ candidates in partition $s$ lie in those bins is
+$(r_s/d)^k$.  Every Hall obstruction is included by taking its actual
+partition-neighborhood sizes.  For $w=3$, the smallest possible obstruction
+has $k=4$ and $(r_1,r_2,r_3)=(1,1,1)$, whose contribution is exactly
+$\binom t4/d^9$.  The remaining terms make
+\equationref{eq:partitioned-hall-bound} a rigorous bound on all larger and
+global obstructions as well.
+
+We evaluated the complete sum in base-two log space.  The resulting bounds
+give the following parameter points; no fitted tail is used in the table.
+
+\begin{center}
+\begin{tabular}{c|cc|cc|cc}
+  $t$ & \multicolumn{2}{c|}{one set, $2^{-40}$}
+      & \multicolumn{2}{c|}{$B=256$, $2^{-40}$ total}
+      & \multicolumn{2}{c}{candidate $+2$ bound bits} \\
+  & $d$ & $3d/t$ & $d$ & $3d/t$ & $d$ & $3d/t$ \\ \hline
+  16  & 51  & 9.563 & 93  & 17.438 & 109 & 20.438 \\
+  64  & 97  & 4.547 & 179 & 8.391  & 208 & 9.750  \\
+  128 & 133 & 3.117 & 244 & 5.719  & 285 & 6.680
+\end{tabular}
+\end{center}
+For the batch column we use the safe union bound and hence target $2^{-48}$
+per set.  The last column targets $2^{-50}$ per set, leaving two bits of
+headroom for implementation-level deviations from the ideal hash model;
+these are candidate benchmark points, not finalized implementation
+parameters.  They cost about 17\% more $d$ than the bound-minimal batch
+parameters because the dominant term scales as $d^{-9}$.  Numerically, the
+per-set bounds at $d=93,179,244$ are respectively
+$2^{-48.0035},2^{-48.0510},2^{-48.0007}$, so the $B=256$ bounds are all at
+most $2^{-40}$.  At $d=109,208,285$ the corresponding per-set exponents are
+$-50.0700,-50.0074,-50.0253$.
+
+For the canonical-witness-corrected Reverse-Cuckoo construction of
+\equationref{eq:rev-cuckoo-general-rank-test}, these are also direct
+standard-simulation bounds: take $\mathcal G=\{Z>0\}$ and $c=1$ in
+\equationref{eq:rev-cuckoo-general-debias}.  Thus the $w=3$ points above
+need only the basic cuckoo analysis and no LPN or syndrome-decoding
+assumption.  The generic $c=1$ reverse sampler can require exponentially many
+proposals, so this statement does not yet make those corrected points a fast
+implementation.  In contrast, the uncorrected prototype retains the
+size-bias leakage and is the object of the leakage game studied next.
+
+The exact Hall-bound program is
+\path{experiments/rev_cuckoo_hall.py}.  The independent matching experiments
+used to check its behavior near the observable threshold and the
+ordinary-cuckoo control are in:
+\begin{center}
+\path{experiments/rev_cuckoo_w23.csv},\quad
+\path{experiments/rev_cuckoo_w23.py},\\
+\path{experiments/rev_cuckoo_normal_control.csv}.
+\end{center}
+The research prototype currently
+supports only $w\in\{2,3\}$, derives a power-of-two $d$ from $(t,w)$, and does
+not use \texttt{cuckooSecParam}; adopting the table requires exposing $d$ (or
+a validated failure target), implementing unbiased range reduction, and
+removing the current byte-sized partition-index restriction.
+
+\paragraph{Ideal exhaustive-rank diagnostic.}
+The following calculation characterizes the ideal leakage channel, but is not
+our primary concrete-security metric.  In particular, a gain relative to
+exhaustive support enumeration is not a gain relative to the best decoding
+attack.
+At cryptographic dimensions the low-weight error is generally unique given
+the Ring-LPN syndrome, so conditional entropy does not directly measure the
+work of finding it.  We therefore also measure how the descriptor prioritizes
+the planted support in an exhaustive support search.  For one ideal descriptor
+write $P(h)=U(h)r(h)$, where
+$r(h)=Z_A(h)/\mathbb E_U[Z_A(H)]$, and let
+$\ell(h)=\log_2 r(h)$.  For a wrong support disjoint from the planted support,
+its score is distributed as $\ell(H_U)$ while the true score is distributed as
+$\ell(H_P)$.  Under $B$ independent ideal descriptors, define
+\[
+ q_B:=\Pr\left[\sum_{i=1}^B\ell(H_{U,i})
+             \mathrel{\geq}\sum_{i=1}^B\ell(H_{P,i})\right],
+\]
+giving half weight to ties.  The pairwise large-deviation exponent is
+\[
+ C_{\mathsf{pair}}
+ =-2\log_2\mathbb E_U[\sqrt r]
+ =-2\log_2\mathbb E_P[r^{-1/2}].
+\]
+We estimate this moment from planted samples and use the measured variance
+under the midpoint distribution proportional to $\sqrt{PU}$ for the finite-$B$
+normal saddlepoint prefactor.  The resulting search-work estimate is
+$g_{\mathsf{search}}=-\log_2(2q_B)$.  In a fully enumerable
+$t=2,w=2,d=2,B=8$ validation, the exact value is 0.6650 bits and the estimate
+is 0.6635 bits.
+
+\begin{center}
+\begin{tabular}{c|r|r|r|r}
+ $w$ & $d$ & KL/list & $C_{\mathsf{pair}}$/list
+     & modeled $g_{\mathsf{search}}$, $B=256$ \\ \hline
+ 2 & 16   & 1.0507   & 0.6342   & 166.46 \\
+ 2 & 64   & 0.1995   & 0.1066   & 30.28 \\
+ 2 & 256  & 0.04644  & 0.02411  & 8.20 \\
+ 2 & 8192 & 0.001397 & 0.000705 & 0.715 \\
+ 3 & 51   & 0.06747  & 0.03455  & 11.08 \\
+ 3 & 93   & 0.03658  & 0.01870  & 6.65 \\
+ 3 & 109  & 0.03261  & 0.01745  & 6.23 \\
+ 3 & 2048 & 0.001596 & 0.000798 & 0.759
+\end{tabular}
+\end{center}
+Thus the current $w=2,d=t=16$ batch has a strong ideal support-ranking signal.
+The three-choice batch-failure and two-bit-margin parameters $d=93,109$ reduce
+the modeled rank gain to roughly 6--7 bits, but negligible placement failure does
+not imply negligible size-bias leakage.  Reducing even this search metric below
+one bit requires roughly $d=8192$ for two choices or $d=2048$ for three choices;
+these are not practical and still do not give 40-bit statistical closeness.
+
+The scale of $g_{\mathsf{search}}$ requires care.  It is a gain relative to
+uninformed exhaustive enumeration of the regular supports, not a loss from the
+best known Ring-LPN attack.  In the conditional support-recovery experiment at
+the current prototype defaults, the corrupt party's $4\cdot16=64$ offsets are
+public and the honest party's 64 offsets range over a block of length
+$L=N/16$.  Thus that enumeration contains $L^{64}$ candidates.
+For $N=2^{16},2^{18},2^{20}$, respectively, subtracting the modeled 166.46-bit
+rank gain from the uniform expected-rank exponents $767,895,1023$ leaves
+approximately $600.5,728.5,856.5$ bits of work.  The estimate therefore does
+not by itself give an attack near the 128-bit target.  In particular, 166.46
+must not be subtracted from a nominal 128-bit Ring-LPN work factor: the two
+figures have different baselines.  Conversely, this comparison is not a
+security proof, because syndrome-decoding algorithms use the public syndrome
+to avoid exhaustive support enumeration.  The concrete question is how much
+the descriptor likelihood improves the best such algorithm.
+
+Regular-noise decoding gives a useful precedent for interpreting this gap.
+If a uniformly random weight-$t$ support in $[N]$ is compared with regular
+noise having one position in each of $t$ blocks, the probability of the former
+being regular is
+\[
+  \frac{(N/t)^t}{\binom Nt}.
+\]
+For $t=16$ and $N=2^{16}$ through $2^{20}$ this is approximately $2^{-19.75}$.
+Nevertheless, Esser and Santini show for random-code syndrome decoding that,
+when $t=o(N)$, ordinary ISD and regular-ISD have the same leading asymptotic
+running time and differ only in lower-order terms~\cite{regularISD}.  Their
+concrete sparse examples include $(n,k,t)=(245760,245460,15)$ and
+$(40960,40660,20)$, for which ordinary ISD and the best regular-ISD estimate
+are respectively tied at 127 and 126 bits.  Thus the negative logarithm of a
+structured support event is not, by itself, a decoding-security loss.
+
+This result does not directly cover Ring-LPN or the Reverse-Cuckoo channel:
+regularity contributes known block equations, whereas our descriptors give a
+candidate-dependent soft likelihood and the Ring-LPN parity-check operator is
+structured.  Moreover, the cited RSD problem is binary, so its regular
+nonzeros have fixed value one, whereas our field-valued sparse polynomials have
+unknown coefficients that a decoder must recover.  The comparison does
+identify the appropriate standard of evidence.  We
+should compare the best leakage-aware decoder with the best decoder for the
+same regular Ring-LPN parameters, rather than require the leaked descriptor to
+be statistically close to an input-independent string.
+
+Stationary syndrome decoding supplies a second comparison point.  Its adapted
+XL system uses linear syndrome equations together with quadratic equations
+forcing all instances to share one location per regular block.  At the
+representative $N=2^{16}$, $k=2^{15}$, $t=69$ point, the reported XL-hybrid
+estimate rises from 128 bits for one instance to 132, 144, 156, and 168 bits
+for respectively $2,16,128$, and $1024$ stationary instances; the best attack
+in that model targets a single instance~\cite{Stationary}.  This is meaningful
+evidence that fresh coefficients can make stationary support reuse robust to
+that algebraic attack.  It does not cover the fixed Reverse-Cuckoo matching
+constraints or the circulant Ring-LPN operator.  Moreover, the relevant
+Hilbert-series estimates use maximal-rank assumptions.  Subsequent work shows
+that the assumptions fail in full generality while supporting important
+degree-two asymptotic regimes and proving separate polynomial-time
+regimes~\cite{soundnessRSD}.  We therefore treat the SSD calculation as a
+successful attack attempt, not as a general nonlinear-security proof.
+
+\paragraph{Primary attack-oriented metric.}
+At the current prototype point, the honest party has four hidden regular sparse
+polynomials, each with $t=16$ nonzeros.  Concatenating them gives 64 regular
+blocks of length $L=N/16$, while the public Ring-LPN equation supplies $N$
+field equations in $4N$ unknown coefficients.  A regular Prange iteration
+chooses an $N$-column solve set, equivalently $L/4$ positions from every one of
+the 64 blocks.  Before accounting for the rank of the selected structured
+matrix, its support success probability without descriptor guidance is exactly
+\[
+ p_{\mathsf{support},0}=(1/4)^{64}=2^{-128}.
+\]
+For an explicit efficient selector $\mathcal A$, let
+$C^{\mathcal A}_{b,j}(X,\Lambda)\subseteq[L]$ be its possibly randomized
+$L/4$-element solve set for block $(b,j)$, and define
+\[
+ p_{\mathcal A}:=Pr\left[
+   Y_{b,j}\in C^{\mathcal A}_{b,j}(X,\Lambda)\ \forall b,j
+   \ \land\ \operatorname{rank}(H_{C^{\mathcal A}})=N
+ \right].
+\]
+The baseline $p_0$ is defined by the same experiment with uniformly sampled
+regular solve sets.  The concrete Prange loss attributable to a demonstrated
+attack is
+\[
+ \Delta_{\mathcal A}:=\log_2(p_{\mathcal A}/p_0),
+\]
+together with the selector's running time and memory.  The rank event is part
+of the metric: the concatenated multiplication matrix is structured, and a
+leakage-biased column choice must not simply be assumed to retain the baseline
+full-rank probability.  Repeated iterations must also use the selector's
+actual sampling distribution; the success probability of a single best
+rectangle is not automatically a decoding work factor.
+
+This gives the evidentiary priority used here.  The exhaustive-rank calculation
+above is useful for checking and understanding the channel.  A security loss
+requires an efficient selector or decoder with measured $\Delta_{\mathcal A}$;
+failure to find one is evidence for, but not a proof of, the conjectured
+leakage-robust assumption.
+
+The ideal channel has a more specific structure.  Fix the public offsets
+$x_{a,u}$ and write $y_b=(y_{b,0},\ldots,y_{b,t-1})$ for one hidden
+polynomial.  Its $Pt$ factors have likelihood
+\[
+ W_b(y_b)=\prod_{a=0}^{P-1}\prod_{k=0}^{t-1}
+ \frac{Z_{\{x_{a,u}+y_{b,k-u}:u\in[t]\}}(\lambda_{a,b,k})}
+      {\mathbb E_U Z}.
+\]
+With independent ideal descriptors, the full posterior factors exactly as
+$\Pr[Y=y\mid X,\Lambda]\propto\prod_b W_b(y_b)$.  Thus the 64 unknown
+offsets form four independent 16-variable matching-weighted regular-noise
+problems, rather than one 64-variable or 256-secret problem.
+
+Exact reduced experiments suggest a \emph{marginally quiet but
+collision-correlated} leakage pattern.  For $P=4,t=d=2$, increasing the block
+length from $L=8$ to 64 increases the full information per unknown polynomial
+from 0.294 to 0.324 bits, while the sum of the two one-offset informations
+falls from 0.070 to 0.012 bits.  The remaining 0.312 bits is posterior
+correlation.  A three-quarter-rate information-set choice based only on the
+one-offset marginals falls from a 0.72-bit one-shot advantage at $L=8$ to 0.17
+bits at $L=64$.  Tests through $t=4$ show the same movement toward pair and
+higher-order correlation, but are too small to extrapolate a concrete loss at
+$t=16$.
+
+We additionally tested an actual regular-Prange iteration.  The selector keeps
+$L/P$ coordinates in every block of each of the $P$ hidden polynomials, giving
+exactly $N$ columns of the structured matrix
+$[I\mid M_{r_1}\mid\cdots\mid M_{r_{P-1}}]$; the experiment verifies that this
+selected square matrix has full rank.  At the production-shaped ratio $P=4$
+but reduced $(t,L)=(3,8)$, the joint posterior-rectangle selector improves the
+one-iteration support probability by 9.78 bits for raw Reverse Cuckoo, 3.61
+bits for occupancy $K=4$, 2.27 bits for occupancy $K=8$, and 0.83 bits for the
+feasibility-only channel.  At $(t,L)=(4,8)$ the last three gains are 6.54,
+4.63, and 1.48 bits.  Doubling $L$ at $(P,t)=(4,3)$ reduces the $K=8$ joint
+gain only from 2.27 to 1.95 bits, consistent with correlation persisting after
+the marginals weaken.  These values show that the leakage can improve a
+genuine linear-algebraic decoding iteration.  They are not production attack
+costs: the selector first enumerates all $L^t$ tuples for each hidden
+polynomial.  A scalable collision-aware selector remains necessary before the
+gain can be charged against a Ring-LPN work factor.  The complete experiment
+is \path{experiments/rev_cuckoo_regular_isd.py}.
+
+We also implemented a polynomial collision-aware selector.  For each public
+list it fits the log likelihood by the number of within-partition collision
+pairs, constructs the resulting pairwise potentials on the $t$ hidden block
+offsets, and applies damped mean-field updates before retaining the $L/P$
+largest beliefs in each block.  Its selection phase does not enumerate the
+$L^t$ joint posterior; exact enumeration is used only to score the selected
+rectangle in these reduced tests.  At $(P,t,L)=(4,3,8)$, this selector gains
+7.52 bits for raw Reverse Cuckoo, 2.22 bits for occupancy $K=4$, and 1.33 bits
+for occupancy $K=8$.  Increasing $L$ to 16 reduces the latter two gains to
+1.64 and 1.05 bits.  At $(P,t,L)=(4,4,8)$ they are 4.17 and 2.35 bits.  Thus
+the best scalable heuristic tested so far extracts only a small additive
+advantage from the finite-$K$ channels, although the reduced instances do not
+justify extrapolation to $t=16$.
+
+For feasibility-only leakage, the fitted pair coefficient is zero: likelihood
+is constant over feasible graphs.  Consequently the pair selector does not
+recover the additional advantage of the exponential joint selector.  A
+scalable Hall-, component-, or matching-aware selector remains the principal
+unresolved attack direction.  Any claimed work-factor loss must also charge
+the preprocessing needed to build its beliefs and amortize that cost across
+Prange iterations.
+
+The pair selector also admits a production-size coordinate diagnostic without
+enumerating the posterior.  Grouping all pair edges of a public list into one
+complete collision factor reduces a mean-field round to $O(Pwt^2L)$ time.  At
+$t=16$, the fraction of planted coordinates retained in the selected quarter
+falls as $L$ grows: for $K=4$ it is 43.2\%, 32.8\%, 28.5\%, and 27.7\% at
+$L=64,256,1024,4096$; the corresponding $K=8$ values are 34.6\%, 25.8\%,
+26.6\%, and 29.7\%.  The baseline is 25\%.  The last two rows use only four
+trials and do not establish a nonzero advantage; in particular, the reversed
+$K$ ordering at $L=4096$ indicates sampling noise.  This supports substantial
+large-$L$ smoothing of coordinate information, but does not measure the mass
+of a correlated regular rectangle.
+
+An attempted production-shaped rectangle scorer based on defensive importance
+sampling agrees with exact enumeration at $t=3$ but has effective sample
+fraction below $10^{-3}$ at $t=16$.  We therefore discard its provisional
+large gain estimates and turn to sequential Monte Carlo.
+
+We next replace direct importance sampling by sequential Monte Carlo.  The
+scorer introduces the $Pt$ exact list-likelihood factors one at a time,
+resamples after each factor, and applies exact single-coordinate Metropolis
+rejuvenation.  At $(P,t,L,K)=(4,3,8,4)$ its separate-normalizer version recovers
+the enumerated gains within 0.026 bits.  At $(4,16,4096)$, however, that
+estimator has a heavy factor-order tail: in a shared-known-support batch its
+dominant apparent gain changes from $+5.66$ to $-3.30$ bits after six more
+replicates.  We therefore retract the preliminary positive screen and its
+speculative 8.6-bit batch extrapolation.
+
+We instead impose the sixteen rectangle restrictions sequentially and estimate
+their conditional probabilities directly.  This splitting estimator agrees
+with exact toy gains within about 0.11 bits.  For the production descriptors
+tested, both the independently thresholded mean-field rectangle and a
+pair-collision coordinate-ascent refinement reach late-stage survival at most
+$1/256$, and sometimes zero, despite diversity refresh and sixteen exact-
+target mutation moves per restriction.  Pair refinement improves one exact toy
+gain from 0.810 to 0.956 bits, but does not convert the production higher-order
+correlation into a positive regular-Prange rectangle.  Thus the current
+scalable selectors demonstrate no concrete $K=4$ or $K=8$ loss.  This is not a
+proof of security: a more global Hall-aware optimizer remains untested.
+
+We finally add sampled exact matching-factor messages.  Fixing the other
+$t-1$ offsets leaves at most $d^2$ endpoint pairs as one offset varies, so
+memoization scores all $L$ candidates using exact feasibility, component, and
+placement-multiplicity information.  On the exact toy, two message rounds
+raise true gain from 0.956 to 1.083 bits.  On the production $K=4$ descriptor,
+the resulting rectangle still reaches only $1/256$-scale late conditional
+survival and gives no positive gain.  We have therefore attempted marginal,
+pairwise, and local matching-aware regular-Prange selectors without finding a
+production attack.  A global Hall-aware optimizer or a different non-rectangle
+decoder remains outside this evidence.
+
+For two choices this correlation is algorithmically structured.  If the
+candidate cuckoo graph has a tree component with $e$ edges, that component
+contributes $e+1$ placements; a unicyclic component contributes 2; an overfull
+component contributes zero.  At $t=d=16$, a simple occupied-bin deficit
+explains 82.2\% of the exact log-placement variance for feasible uniform graphs
+and 84.5\% for planted graphs; pair-collision count alone explains 72.9\% and
+76.8\%.  The likely attack interface is therefore a planted repulsive
+constraint system, not independent leaked coordinates and not an unstructured
+global score.
+
+This motivates two explicit conjectures for further cryptanalysis.  First,
+for fixed $P,t,w,d$ in the ideal random-function model, each single-offset
+information $I(Y_{b,j};\Lambda_b\mid X)$ tends to zero as $L\to\infty$, while
+the joint information may approach a positive constant.  Second, in the sparse
+regular-noise regime, adding these matching weights does not change the leading
+asymptotic exponent of the best regular decoder, analogously to regular-ISD,
+although it may cause a material additive concrete loss.  Neither conjecture
+follows from the present experiments: a collision-aware list or ISD algorithm
+could exploit the surviving joint constraints, and the shared Goldreich
+feature channel may behave differently from the ideal one.
+
+The batch interpretation also matters.  The 256 product-list descriptors
+constrain only the same 64 unknown offsets; the ideal rank exponent is about
+2.6 bits per unknown offset, not 166 bits directly revealed about 256
+independent secrets.  Moreover, the product lists overlap algebraically and
+the implementation reuses a public Goldreich feature root across the batch.
+The independent-descriptor calculation is consequently neither an upper nor
+a lower bound on the real joint channel.
+
+The calculation assumes independent random-function descriptors, disjoint
+wrong supports, and an ideal likelihood-ordered search.  It is not yet an
+efficient decoding attack, and it does not model the implementation's shared
+Goldreich feature matrices.  Raw moments and deterministic seeds are in
+\path{experiments/rev_cuckoo_rank_results.csv}.
+
+\paragraph{Research status.}
+This implementation is a research prototype, is not known to be deployed or
+used in production, and the present manuscript is a recent unpublished ePrint
+preprint.  The leakage analysis is ongoing.  Parameter rows in this section are
+experimental comparison points rather than standardized or deployment-ready
+recommendations.
 \fi

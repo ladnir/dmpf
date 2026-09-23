@@ -1,0 +1,637 @@
+\section{Waterfall Cuckoo Details and Alternative Profiles}
+\label{app:waterfall-details}
+
+This appendix gives the circuit-level complete-repair generator, the exact
+failure calculations behind \tableref{tab:waterfall-parameters}, and the OT
+accounting used for its concrete totals.  It then records a shallow
+single-repair alternative.  All profiles use the top-level protocol and
+simulation theorem from \sectionref{sec:waterfallCuckoo}.
+
+\subsection{Complete-repair circuit}
+
+The circuit represents the current matching by row-to-partition bits
+$M_{i,s}$ and the cached candidate unit vectors
+$D_{i,s}:=\unitVec_{[0,d_s)}(C_{i,s},1)$.  The physical placement is recovered
+as $O_{i,\Delta_s+b}=M_{i,s}D_{i,s}[b]$.  At the start of each repair round,
+the circuit materializes from $M$ an occupancy vector $T_s$ and an $h$-bit
+owner array $J_s$ for every partition, where $h:=\lceil\log_2t\rceil$.
+Thus $T_s[b]=1$ exactly when bin $(s,b)$ is matched, and $J_s[b]$ holds its
+matched row.  A secret-index mux reads
+$(T_s[C_{i,s}],J_s[C_{i,s}])$.  Every priority choice below is implemented by
+the prefix circuit
+\[
+ \mathsf{first}(x)_i:=x_i\bigwedge_{j<i}(1-x_j).
+\]
+
+Let $q_i:=1-\sum_sM_{i,s}$ identify all unmatched rows.  One repair uses a
+public $t$-step multi-source reachability search initialized with every row for
+which $q_i=1$.  At each step it expands the first visited but unexpanded row in
+public row order and reads all $w$ candidate-owner records.  A free record
+terminates the search.  An occupied record inserts its owner unless that row
+was already visited, and stores the current row and partition as the owner's
+parent.  Since a row is expanded at most once, $t$ steps exhaust every row
+reachable from any unmatched root.  The circuit then follows the selected
+parent chain for $t$ fixed steps and flips the corresponding row-to-partition
+assignments.  Gating every write by the selected target makes all unused steps
+no-ops.
+
+\begin{figure}[H]\scriptsize
+\centering
+\fbox{\begin{minipage}{.95\textwidth}
+\noindent
+$\mathsf{WaterfallGen}_{\mathbf d,c,r}
+\bigl(\share C\in\prod_{s\in[0,w)}[0,d_s)^t\bigr)
+\longrightarrow\share O\in\{0,1\}^{t\times m}$,
+where $m:=\sum_{s\in[0,w)}d_s+c$.
+\par\smallskip
+Party $p\in\{0,1\}$ computes:
+
+\begin{enumerate}[nosep]
+ \item Compute $\share a,\share\ell,\share u$, the initial matching
+ $\share M$, and $\share q$ by the occupancy scan in
+ \equationref{eq:waterfall-state-transition}.  Cache
+ $\share D_{i,s}:=\unitVec_{[0,d_s)}(\share C_{i,s},1)$.
+
+ \item For $v\in[r]$:
+ \begin{enumerate}[nosep]
+ \item Materialize $(\share T_s,\share J_s)_{s\in[0,w)}$
+ from $\share M$ and the cached decoders, and set
+ $\share q_i:=1-\sum_s\share M_{i,s}$ for every $i\in[0,t)$.
+
+ \item Initialize $\share V:=\share q$, $\share E:=0^t$, and zero parent
+ arrays $\share\pi\in[0,t)^t$ and $\share\eta\in[0,w)^t$.
+ Reset the target-selected flag to zero.
+
+ \item For $a\in[0,t)$, let
+ $\share f:=\mathsf{first}(\share V\land(1-\share E))$ and add $\share f$
+ to $\share E$.  For each $s\in[0,w)$, read the occupancy bit and owner at the
+ candidate of $\share f$ from $(\share T_s,\share J_s)$.  Select the first
+ free candidate if no target has yet been selected.  Otherwise, insert each
+ newly seen owner into $\share V$ in partition order. Store
+ $(\sum_{i\in[0,t)}i\share f_i,s)$ in its parent record on first discovery.
+ Gate every read and write by an active selected row and an unset target flag.
+
+ \item Starting from the row and partition of the selected free candidate,
+ perform $t$ gated backtracking steps.  At each step, assign the current row
+ to the current partition, clear its previous partition assignment, and, if
+ $\share q_i=0$ for the current row $i$, move to its stored parent record.
+ Reaching a root ends the active path; if no free candidate was selected,
+ leave $\share M$ unchanged.
+ \end{enumerate}
+
+ \item Recompute $\share q_i:=1-\sum_s\share M_{i,s}$ and
+ $\share R_i:=\sum_{j<i}\share q_j$.  Set
+ $\share O_{i,\Delta_s+b}:=\share M_{i,s}\share D_{i,s}[b]$ and
+ $\share O_{i,\Delta_w+k}:=\share q_i[\share R_i=k]$.
+
+ \item Return $\share O$.
+\end{enumerate}
+\end{minipage}}
+\caption{Gate-level organization of the canonical complete-repair generator.
+All loops have public bounds; muxes, unit-vector decoders, prefix priority, and
+gated writes expand to Boolean products and XORs.
+\label{fig:waterfallReachabilityProtocol}}
+\end{figure}
+
+\begin{lemma}[Complete-search invariant]
+\label{lem:waterfall-reachability-round}
+Before the search selects a free bin, $V$ consists exactly of the unmatched
+roots and the matched owners discovered from expanded rows.  Every discovered
+non-root row stores the first edge by which it was discovered, and the parent
+records form a forest rooted at the unmatched rows.  If no free bin has been
+selected after $t$ steps, every row reachable from an unmatched root has been
+expanded.  If the search selects a free bin, the parent records define a
+simple augmenting path from one root to that bin.
+\end{lemma}
+
+\begin{proof}
+Initially, $V$ contains exactly the unmatched roots.  Expanding a visited row
+examines all of its candidate edges.  A free endpoint completes an alternating
+path.  An occupied endpoint extends the path through its uniquely matched
+owner.  The visited mask inserts each owner once, so its first stored parent is
+never overwritten and the parent relation is a forest.  Conversely, the
+circuit adds a non-root row only through such an occupied candidate edge.
+Induction proves the discovery claim.  Unless a free endpoint terminates the
+search, each of the $t$ steps expands one previously unexpanded reachable row;
+there are at most $t$ rows.  Backtracking follows one tree of the parent forest
+to its unmatched root and therefore flips exactly one simple augmenting path.
+\end{proof}
+
+The path flip preserves the row and column inequalities in
+\equationref{eq:waterfall-placement-invariants} and increases the main
+matching size by one.  Candidate decoders ensure
+\equationref{eq:waterfall-placement-subset}.  This proves the invariant
+used by \namedref{Proposition}{prop:waterfall-reachability-repair}.
+
+\subsection{Exact failure calculations}
+
+Let $L_s$ be the number of live rows entering partition $s$, with $L_0=t$.
+If $L_s=n$ and the $n$ independent candidates occupy $j$ bins, then
+$L_{s+1}=n-j$.  Write
+$\genfrac\{\}{0pt}{}{n}{j}$ for a Stirling number of the second kind.  Then
+\begin{equation}\label{eq:waterfall-occupancy-transition}
+ \Pr[L_{s+1}=n-j\mid L_s=n]
+ =\frac{(d_s)_j\genfrac\{\}{0pt}{}{n}{j}}{d_s^n}.
+\end{equation}
+Dynamic programming over this transition gives the exact overflow tail
+\begin{equation}\label{eq:waterfall-overflow-tail}
+ \Pr[L_w>r+c]=\sum_{\ell>r+c}\Pr[L_w=\ell].
+\end{equation}
+For a fixed set of $q$ rows, the probability that their candidates occupy
+exactly $j$ bins in partition $s$ is
+\begin{equation}\label{eq:waterfall-fixed-set-occupancy}
+ \Pr[|N_s(Q)|=j]
+ =\frac{(d_s)_j\genfrac\{\}{0pt}{}{q}{j}}{d_s^q}.
+\end{equation}
+
+Hall's theorem fails only if some $q$ rows have at most $q-1$ total neighbors.
+A union bound over the row set and its per-partition neighbor counts gives
+\begin{equation}\label{eq:waterfall-hall-bound}
+ \Pr[G_C\text{ has no size-$t$ matching}]
+ \leq\sum_{q=1}^{t}\binom tq
+ \sum_{\substack{j_0,\ldots,j_{w-1}\geq0\\
+                  \sum_sj_s\leq q-1}}
+ \prod_{s\in[0,w)}
+ \frac{(d_s)_{j_s}\genfrac\{\}{0pt}{}{q}{j_s}}{d_s^q}.
+\end{equation}
+The implementation evaluates \namedeqref{Equations}{eq:waterfall-overflow-tail}
+and~\eqref{eq:waterfall-hall-bound} with exact rational arithmetic before
+converting the final bounds to bits.
+
+One useful necessary check comes from identical candidate vectors.  Put
+$D:=\prod_sd_s$.  If some candidate vector occurs more than $w$ times, those
+rows have only $w$ neighbors and violate Hall's condition.  Exact occupancy
+counting gives
+\begin{equation}\label{eq:waterfall-identical-candidate-probability}
+ \Pr[\text{maximum candidate multiplicity}>w]
+ =1-\frac{t!}{D^t}[z^t]
+ \left(\sum_{j=0}^{w}\frac{z^j}{j!}\right)^D.
+\end{equation}
+This check rules out overly small candidate spaces before the full Hall sum is
+evaluated.
+
+For $t=16$ and $B_0=256$, the complete-repair profiles give
+\[
+\begin{array}{c|cc}
+ & \text{Hall bits} & \text{overflow bits}\\ \hline
+(16,16,16,16),\ c=0,r=3 & 43.83 & 45.24\\
+(128,128,64),\ c=0,r=2 & 41.15 & 47.07
+\end{array}
+\]
+Combining the two terms in
+\equationref{eq:waterfall-reachability-rejection} gives 43.37 and 41.13
+batch-correctness bits, respectively.
+
+\subsection{OT accounting}\label{sec:waterfallMpcCost}
+
+We compare profiles by $(Q_{\mathsf{OT}},B_{\mathsf{OT}})$, where the first
+coordinate counts OTs and the second sums their payload lengths.  A product of
+a shared bit and a shared $\lambda$-bit string costs two $\lambda$-bit OTs and
+contributes $(2,2\lambda)$.  XORs, public linear maps, openings, local PRG
+calls, depth, and rounds are free.
+
+Let $k_s:=\log_2d_s$, $h:=\lceil\log_2t\rceil$,
+$D:=\lceil\log_2N\rceil$, $\ell:=\max\{1,D\}$,
+$g:=\log_2|\mathbb G|$, $h_m:=\lceil\log_2m\rceil$, and
+$L_{\mathsf{sc}}:=t+D+2$.  To evaluate all hash polynomials, compute powers
+of each secret $\iota(A_i)$ once and reuse them across partitions.  Squaring
+is linear; only the $\nu_t:=\lfloor(t-2)/2\rfloor$ odd powers require a field
+multiplication.
+
+Recursive polynomial-basis Karatsuba gives
+\begin{equation}\label{eq:waterfall-karatsuba-cost}
+ K(1):=1,
+ \qquad
+ K(\ell):=K(\lfloor\ell/2\rfloor)+2K(\lceil\ell/2\rceil).
+\end{equation}
+At $\ell=20$, use
+$\mathbb F_{2^{20}}\cong\mathbb F_{16}[Y]/(Y^5+Y^2+1)$ and evaluate the two
+degree-four operands at nine points of $\mathbb F_{16}$.  Nine pointwise
+$\mathbb F_{16}$ products, each costing $K(4)=9$ bit products, give an
+81-product multiplier.  Evaluation, interpolation, reduction, and basis
+conversion are binary linear maps.  Put $M(20):=81$ and
+$M(\ell):=K(\ell)$ otherwise.  Hashing and dummy selection contribute
+\begin{equation}\label{eq:waterfall-hash-ot-cost}
+ q_{\mathsf{hash}}:=t\nu_tM(\ell)+wt,
+ \qquad
+ b_{\mathsf{hash}}:=t\nu_tM(\ell)+t\sum_sk_s.
+\end{equation}
+
+For a sparse set $S_j$, let $\sigma(S_j)$ count the binary trie depths that
+contain a split, and put
+\begin{equation}\label{eq:waterfall-dpf-split-levels}
+ \Sigma(P):=\sum_{j:S_j\neq\emptyset}\sigma(S_j)\leq mD.
+\end{equation}
+Each binary correction selects between shared child sums. It therefore
+costs two OTs, not one. We charge $\kappa$ bits per selected message,
+including the implementation's full-block representation.
+At a sparse level, masking both child sums costs a further two OTs with
+$2\kappa$-bit messages. The mask depends on secret activity and cannot be
+omitted merely because public splitting nodes exist.
+
+The implementation first expands a complete binary prefix of depth
+$D_0:=\min\{D,h_m+2\}$, then prunes the remaining public subtrees.
+Activity is known to be one at each complete level; only the residual
+sparse levels need masking. The row-to-column trees are fully dense.
+For a conservative reservation bound, put
+\[
+ C_{\mathsf{DPF}}:=mD+th_m,
+ \qquad M_{\mathsf{DPF}}:=m(D-D_0).
+\]
+These count correction selections and activity masks, respectively.
+Skipping unused public levels can reduce consumption below this bound.
+Let $\chi=0$ for groups of characteristic two and $\chi=1$ otherwise.
+In the latter case, each DPF additionally caches one sign--payload product,
+costing two OTs with $g$-bit messages. Thus reusable DPF initialization contributes
+\begin{align}
+ Q_{\mathsf{DPF}}&=2\bigl(C_{\mathsf{DPF}}+M_{\mathsf{DPF}}+\chi(m+t)\bigr),
+ \label{eq:waterfall-dpf-ot-count}\\
+ B_{\mathsf{DPF}}&=2\kappa C_{\mathsf{DPF}}+4\kappa M_{\mathsf{DPF}}
+                  +2g\chi(m+t).
+ \label{eq:waterfall-dpf-ot-bits}
+\end{align}
+The sign controls depend on cached tags, so their correlations are charged
+once, not once per expansion. This accounting does not change the leaf
+conversion or local expansion work.
+
+If $q_m$ is the number of switches in one recursive
+Waksman pass, then
+\[
+ q_1:=0,
+ \quad q_2:=1,
+ \quad q_m:=2\lfloor m/2\rfloor+q_{\lfloor m/2\rfloor}
+ +q_{\lceil m/2\rceil}\quad(m>2).
+\]
+The two serial privately controlled passes contribute
+\begin{equation}\label{eq:waterfall-waksman-ot-cost}
+ (2q_m,2q_mL_{\mathsf{sc}}).
+\end{equation}
+
+For deduplication, cache the first-occurrence bits and the equality bits
+gated by those first-occurrence bits. Expansion multiplies each retained
+payload by its activity bit and routes each later equal payload to its first
+occurrence. This requires at most $t+\binom t2=t(t+1)/2$ shared
+bit--payload products. Their controls depend only on setup addresses.
+The model charges the corresponding OT correlations once, with $g$-bit
+payload width; round-separated expansion reuses them but still communicates
+masked payloads. The formulas below do not count those online messages.
+The common deduplication and activity path has
+\begin{align}
+ q_{\mathsf{common}}
+  &=\binom t2D+\frac{(t-1)(t-2)}2+tD
+    +\frac{t(t+1)}2+3t,
+    \label{eq:waterfall-common-ot-count}\\
+ b_{\mathsf{common}}
+  &=\binom t2D+\frac{(t-1)(t-2)}2+t(D+1)
+    +\frac{t(t+1)}2g+t+t(2D+1).
+    \label{eq:waterfall-common-ot-bits}
+\end{align}
+
+The optimized initial scan performs one mux-tree occupancy read, one gated
+unit-vector decoder, and one live-bit product per row and partition.  Stash
+compaction adds one product per row.  Thus the initial stage has
+\begin{align}
+ q_{\mathsf{basic}}&=t\sum_s(2k_s+1)+t,
+ \label{eq:waterfall-basic-ot-count}\\
+ b_{\mathsf{basic}}&=t\sum_s(2d_s-1)+t(c+1).
+ \label{eq:waterfall-basic-ot-bits}
+\end{align}
+For complete repair, the scan caches raw and winning decoders and gates the
+final matching once.  Its base profile is
+\begin{equation}\label{eq:waterfall-bounded-base-cost}
+ q_{\mathsf{base}}=t\sum_s(2k_s+2)+t,
+ \qquad
+ b_{\mathsf{base}}=t\sum_s(4d_s-3)+t(c+1).
+\end{equation}
+
+With packed control bits, one complete augmentation contributes
+\begin{align}
+ q_{\mathsf{reach}}
+  :={}&wt+t\sum_sk_s+t(t+2h+wh+3w+2)\nonumber\\
+     &+(w-1)+(t-1)(2h+w)+t,
+ \label{eq:waterfall-reachability-augmentation-ot-count}\\
+ b_{\mathsf{fwd}}
+  :={}&t\bigl((t-1)(2+w(h+4))+ht+4w\bigr),\nonumber\\
+ b_{\mathsf{back}}
+  :={}&(w-1)(t-1)
+     +(t-1)\bigl((h+2w+1)(t-1)+1\bigr)+tw,\nonumber\\
+ b_{\mathsf{reach}}
+  :={}&t\sum_s(d_s-1)+t(h+1)\sum_s(d_s-1)
+     +b_{\mathsf{fwd}}+b_{\mathsf{back}}.
+ \label{eq:waterfall-reachability-augmentation-cost}
+\end{align}
+Consequently,
+\begin{align}
+ q_{\mathsf{BA}}&=q_{\mathsf{base}}+rq_{\mathsf{reach}},
+ \label{eq:waterfall-reachability-ot-count}\\
+ b_{\mathsf{BA}}&=b_{\mathsf{base}}+rb_{\mathsf{reach}}.
+ \label{eq:waterfall-reachability-ot-bits}
+\end{align}
+Combining all components gives
+\begin{align}
+ Q_{\mathsf{OT}}
+  &=2(q_{\mathsf{common}}+q_{\mathsf{BA}}+q_{\mathsf{hash}})
+    +2q_m+Q_{\mathsf{DPF}},
+    \label{eq:waterfall-total-ot-count}\\
+ B_{\mathsf{OT}}
+  &=2(b_{\mathsf{common}}+b_{\mathsf{BA}}+b_{\mathsf{hash}})
+    +2q_mL_{\mathsf{sc}}+B_{\mathsf{DPF}}.
+    \label{eq:waterfall-total-ot-bits}
+\end{align}
+At $t=16$, $N=2^{20}$, $\kappa=128$, and $\mathbb G=\mathbb Z_{2^{64}}$,
+these equations give
+$(39{,}052,942{,}888)$ for the default $4N$ profile and
+$(55{,}358,3{,}623{,}410)$ for the lower-expansion $3N$ profile, matching
+\tableref{tab:waterfall-parameters}.
+Their dense-prefix depths are 8 and 11. The DPF terms are, respectively,
+$(4{,}448,755{,}712)$ and $(19{,}520,3{,}192{,}832)$.
+For a characteristic-two group of the same size, omit $2(m+t)$ OTs and
+$128(m+t)$ payload bits from each total.
+
+\subsection{Specialized single-repair profile}
+\label{app:waterfallOneRepair}
+
+This setup-minimized alternative performs one fixed depth-two augmentation
+after the initial waterfall stage.  If $L:=\sum_iq_i\leq c$, the stash holds
+all overflow rows.  If $L=c+1$, it selects the first overflow row, inspects the
+later candidates of the rows occupying its candidates, and applies the first
+free length-two path.  Otherwise the excess rows remain unplaced.  The
+protocol opens no failure bit; the simulation theorem charges this event to
+$p_{\mathsf{1rep}}$.
+
+\begin{figure}[H]\scriptsize
+\centering
+\fbox{\begin{minipage}{.95\textwidth}
+ \noindent
+ $\textsf{OneRepairWaterfallGen}_{w,d,c}
+ \bigl(\share C\in[0,d)^{t\times w}\bigr)
+ \longrightarrow\share O\in\{0,1\}^{t\times(wd+c)}$.
+ \par\smallskip
+ Party $p\in\{0,1\}$ computes:
+\begin{enumerate}
+  \item Compute $\share a,\share\ell,\share u$, the main-position matrix
+  $\share O^{(0)}$, $\share q$, and $\share R$ as in
+  \namedeqref{Equations}{eq:waterfall-state-transition},
+  \eqref{eq:waterfall-main-owner}, and~\eqref{eq:waterfall-stash-rank}.
+
+  \item $\share L:=\sum_{i\in[0,t)}\share q_i$,
+  $\share x_i:=\share q_i\land\textsf{eq}(\share R_i,0)$ for $i\in[0,t)$,
+  and $\share f_{\mathsf{try}}:=\textsf{eq}(\share L,c+1)$.
+
+  \item For $u\in[0,w)$, let
+  $\share b_u:=\sum_{i\in[0,t)}\share x_i\share C_{i,u}$ and, for $i\in[0,t)$,
+  \[
+    \share v_{u,i}:=\bigvee_{b\in[0,d)}
+      \bigl(\textsf{eq}(\share b_u,b)\land\share O^{(0)}_{i,ud+b}\bigr).
+  \]
+  Write $\share v_u$ for the row selected by the one-hot vector
+  $(\share v_{u,i})_{i\in[0,t)}$, and similarly write $\share x$ for
+  $(\share x_i)_{i\in[0,t)}$.
+
+  \item For $(u,s)\in[0,w)^2$ with $u<s$, let
+  $\share b_{u,s}:=\sum_{i\in[0,t)}\share v_{u,i}\share C_{i,s}$ and
+  \[
+    \share g_{u,s}:=\share f_{\mathsf{try}}\land
+      \bigwedge_{i\in[0,t)}\bigwedge_{b\in[0,d)}
+      \neg\bigl(\textsf{eq}(\share b_{u,s},b)
+                 \land\share O^{(0)}_{i,sd+b}\bigr).
+  \]
+
+  \item In lexicographic order on $(u,s)$, let
+  $\share z_{u,s}:=\share g_{u,s}\land
+  \neg\bigvee_{(u',s')<(u,s)}\share g_{u',s'}$ and
+  $\share z:=\bigvee_{u<s}\share z_{u,s}$.
+
+  \item For $(i,a,b)\in[0,t)\times[0,w)\times[0,d)$, set
+  \begin{align*}
+   \share\Delta^{\mathsf{old}}_{i,a,b}
+    &:=\bigoplus_{u<s}\share z_{u,s}[a=u]
+       \textsf{eq}(\share b_u,b)
+       (\share v_{u,i}\oplus\share x_i),\\
+   \share\Delta^{\mathsf{new}}_{i,a,b}
+    &:=\bigoplus_{u<s}\share z_{u,s}[a=s]
+       \textsf{eq}(\share b_{u,s},b)\share v_{u,i},\\
+   \share O^{(1)}_{i,ad+b}
+    &:=\share O^{(0)}_{i,ad+b}
+       \oplus\share\Delta^{\mathsf{old}}_{i,a,b}
+       \oplus\share\Delta^{\mathsf{new}}_{i,a,b}.
+  \end{align*}
+
+  \item For $i\in[0,t)$, let
+  $\share q'_i:=\share q_i\land\neg(\share x_i\land\share z)$ and
+  $\share R'_i:=\sum_{j<i}\share q'_j$.  For $(k,i)\in[0,c)\times[0,t)$, set
+  $\share O^{(1)}_{i,wd+k}:=\share q'_i\land
+  \textsf{eq}(\share R'_i,k)$.
+
+  \item Return $\share O^{(1)}$.
+\end{enumerate}
+\end{minipage}}
+\caption{The specialized single depth-two repair followed by stash
+compaction.\label{fig:waterfallOneRepairProtocol}}
+\end{figure}
+
+\subsection{Failure bound and parameters}
+
+For a live-count path $\boldsymbol L=(L_0,\ldots,L_w)$ under
+\equationref{eq:waterfall-occupancy-transition}, put
+$J_s:=L_s-L_{s+1}$ and let $p(\boldsymbol L)$ denote the path probability.
+
+\begin{proposition}[One-repair failure bound]
+\label{prop:waterfall-one-repair}
+Fix $d\in\mathbb N$, and define
+\[
+ \mathbf d:=(d,\ldots,d)\in\mathbb N^w.
+\]
+Then
+\begin{equation}\label{eq:waterfall-one-repair-bound}
+ p_{\mathsf{1rep}}
+ \leq \Pr[L_w\geq c+2]
+ +\sum_{\boldsymbol L:L_w=c+1}
+   p(\boldsymbol L)
+   \prod_{s=1}^{w-1}\left(\frac{J_s}{d}\right)^s.
+\end{equation}
+\end{proposition}
+
+\begin{proof}
+The first term covers every proposal with at least $c+2$ overflow rows.  Fix a
+path ending in $c+1$ rows and let $x$ be the selected
+overflow row.  Its candidate in partition $u$ is occupied by a row $v_u$
+placed in that partition.  The $v_u$ are distinct because a placed row owns
+only one position.  Every candidate of $v_u$ through partition $u$ was tested
+by the waterfall and is occupied.  For every later partition $s>u$, however,
+$C_{v_u,s}$ was never inspected because $v_u$ had already left the live set.
+These cells are mutually independent and uniform, and are independent of the
+$J_s$ occupied bins in partition $s$.  Exactly $s$ such untouched cells target
+partition $s$, one from each $v_0,\ldots,v_{s-1}$.  All length-two paths are
+blocked with probability $\prod_{s=1}^{w-1}(J_s/d)^s$.  Summing over the
+live-count paths proves the bound.
+\end{proof}
+
+For $t=16$ and $B_0=256$, the compact proved profile is:
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{@{}rrrrrrrr@{}}
+\toprule
+$w$ & $d$ & $c$ & $m$ & expansion & total OTs & OT payload & batch bits \\
+\midrule
+4 & 16 & 2 & 66 & $6N$ & 30{,}980 & 829{,}288 bits & 45.23 \\
+\bottomrule
+\end{tabular}
+\caption{The retained specialized one-repair profile.
+\label{tab:waterfall-one-repair-parameters}}
+\end{table}
+
+The compact point $(w,d,c)=(4,16,2)$ satisfies
+\begin{align}
+ \Pr[L_4\geq4]&<2^{-53.2360},\nonumber\\
+ \Pr[L_4=3\text{ and depth-two repair fails}]&<2^{-60.6651},\nonumber\\
+ p_{\mathsf{1rep}}&<2^{-53.2277}.
+ \label{eq:waterfall-compact-point}
+\end{align}
+Thus $B_0p_{\mathsf{1rep}}<2^{-45.2277}$.  It uses 66 position columns and $6N$
+local expansion.
+
+\subsection{OT count}
+
+Put $k:=\log_2d$, $h:=\lceil\log_2t\rceil$,
+$\omega:=\lceil\log_2w\rceil$, and $P:=\binom w2$.  For the OT-minimized
+realization, augment the occupancy scan from
+\sectionref{sec:waterfallMpcCost} with an $h$-bit owner array
+$J_s\in[0,t)^d$ for each partition.  Whenever row $i$ wins with gated unit vector
+$E_i$, update the bit planes of $J_s$ by the public binary encoding of $i$
+times $E_i$.  This is linear.  Reading $J_s[C_{i,s}]$ later returns the owner
+of an occupied candidate without an all-pairs equality scan.
+
+During the scan, also cache the ungated unit vector for every $C_{i,s}$.
+Its decoder shares the same address bits and dependency level as the winning
+unit-vector decoder, so their string operands are concatenated in each OT.
+After the repair, one wide product gates the cached vector by the final
+row-to-partition matching bit; one coordinate is recovered linearly from the
+unit-vector sum.  Together, the scan, both decoders, and final gate use
+$2k+2$ products with width sum $4d-3$ per row and partition.
+
+The one-hot overflow root gives its $h$-bit row number by a public linear map.
+One mux tree, batched across all $w$ candidate arrays, reads its candidates.
+The $w$ owner reads use the corresponding $k$-bit candidate addresses.  For a
+fixed victim, reads of all its later-partition candidates share the same row
+address and are likewise batched.  The resulting $P$ candidate addresses read
+the occupancy arrays.  Finally, a priority scan selects the first feasible
+pair, a mux selects its victim identifier, and two demux trees route the
+$w$-bit matching deltas to the root and victim rows.  This gives
+\begin{align}
+ q_{\mathsf{1rep}}
+  ={}&wt(2k+2)+2t+(w+2)h+k(w+P)+P+\omega+3,
+  \label{eq:waterfall-one-repair-ot-count}\\
+ b_{\mathsf{1rep}}
+  ={}&wt(4d-3)+t(2c+3)+wk(t-1)+wh(d-1)\nonumber\\
+    &+Pk(t-1)+P(d-1)+2P+2^\omega h+2w(t-1)+1.
+  \label{eq:waterfall-one-repair-ot-bits}
+\end{align}
+At $(t,w,d,c)=(16,4,16,2)$ these are
+$q_{\mathsf{1rep}}=747$ and $b_{\mathsf{1rep}}=5{,}095$.
+These expressions are conservative upper bounds; omitting the unused explicit
+failure test only lowers them.  Including the common, direct-hash, scatter,
+column sparse-DPF, and cached row-to-column DPF terms from
+\namedeqref{Equations}{eq:waterfall-total-ot-count}
+and~\eqref{eq:waterfall-total-ot-bits} gives at most $30{,}980$ OTs carrying
+$829{,}288$ payload bits for $\mathbb G=\mathbb Z_{2^{64}}$.
+
+\subsection{Asymmetric complete-repair profile}
+
+The complete-repair generator also supports
+$\mathbf d=(32,32,16,8)$, $c=0$, and $r=2$.  This profile has $m=88$,
+$41.20$ bits of batch correctness, and $4N$ local expansion.  Substitution in
+\namedeqref{Equations}{eq:waterfall-total-ot-count} and
+\eqref{eq:waterfall-total-ot-bits} gives $38{,}158$ OTs carrying $1{,}162{,}710$
+payload bits. It saves $894$ OTs relative to the default profile, but adds
+24 physical columns, about $26.8$ KiB of OT payload, and a smaller correctness
+margin.  We therefore retain it as a setup-versus-state alternative rather
+than a main profile.
+
+\subsection{Hybrid simulator for Waterfall}
+\label{app:waterfall-simulator}
+
+This subsection supplies the simulator used in
+\namedref{Theorem}{thm:waterfall-simulation}.  Fix a static semi-honest corrupted
+party $p\in\{0,1\}$.  Circuit, permutation, and reusable DPF calls are ideal.
+The simulator receives party $p$'s setup input shares and, for each expansion,
+its payload shares. It maintains the simulated caller's shares and public
+state between calls. Ideal subprotocols expose no additional implementation
+state. At every ideal DPF expansion, the corrupt party selects its output
+share using its current view. The simulator runs this strategy on the
+simulated view; it does not replace the selected map by an independent sample.
+When composing concrete DPF realizations, their stateful simulators supply
+these strategies and simulate their own local states and messages.
+
+\paragraph{Setup calls and opening.}
+The simulator samples each public $h_s$ from $\mathcal H_{t,k_s}$ and derives
+$P$ and $S$.  It follows the setup circuit in order.  For each fresh secret
+output of an ideal circuit call, it samples the corrupted party's share with
+the prescribed uniform law.  It computes local linear operations, public
+constants, and repeated uses of a share rather than resampling them.
+This simulates the normalization and placement calls without knowing the
+honest party's address shares.
+
+Each ideal permutation pass returns freshly shared outputs while retaining
+its private permutation for the inverse call.  The simulator samples the
+corrupted party's output shares for these calls. It also retains the corrupt
+party's sampled permutation and its inverse, which are part of that party's
+local view. At the opening, it samples
+$V\gets\mathsf{Inj}(t,m)$ and sends the honest opening share
+$V\oplus\widehat O_p$.  The public scatter is then a deterministic operation
+on $V$ and the previously sampled shares.  In particular, the simulator
+does not independently resample the public scatter's outputs.  It continues
+with the inverse permutation outputs, computes the representative addresses,
+and supplies the setup responses of the row and column DPF functionalities.
+On successful routing their indices are valid, so those responses are
+$\mathsf{ready}$.
+
+For every fixed hash tuple and successful candidate matrix, the hidden
+honest permutation makes the real opening uniform on $\mathsf{Inj}(t,m)$.
+Couple that opening to $V$.  The simulated hashes are still unconditioned
+samples: routing success need not be independent of the hashes.  If routing
+fails, discard this coupling and charge the entire continuation to the
+failure event.  This includes the unmatched row labels exposed by the opening.
+Its probability is $p_\Gamma$ for every fixed setup input.
+
+\paragraph{Expansion calls.}
+The simulator retains the setup shares used for duplicate aggregation.
+It samples the fresh private outputs of the ideal multiplication calls and
+computes their specified local sums. For each row $i\in[0,t)$, let
+$v_{p,i}\in\mathbb G^{[0,m)}$ be the map chosen by the corrupt party at its
+row-to-column DPF call. The simulator computes the corrupt column-payload
+share $B'_{p,j}:=\sum_{i\in[0,t)}v_{p,i}(j)$ for each $j\in[0,m)$.
+These are the inputs to its column-DPF calls. No row destination, equality
+bit, or setup state is sampled again.
+
+For each nonempty $S_j$, let $Z_{p,j}\in\mathbb G^{S_j}$ be the corrupt
+output map selected at column DPF $j$. The simulator follows those selections
+and computes
+\begin{equation}\label{eq:waterfall-sim-output-completion}
+ Y_p(x):=\sum_{j:x\in S_j}Z_{p,j}(x),\qquad x\in[0,N).
+\end{equation}
+It submits $Y_p$ to $\mathcal F_{\mathsf{rDMPF}}$. Empty sparse sets require
+no DPF call. This procedure imposes no distribution on the selected maps
+beyond that of the corrupt strategy on its simulated view.
+
+\paragraph{Honest outputs and reuse.}
+On successful routing, each ideal DPF gives the honest party the complement
+to the specified point map. Summing those complements and applying
+\namedref{Proposition}{prop:waterfall-correctness} gives the honest DMPF output
+$\mathsf{mp}_{N,t}(A,B)-Y_p$. This is exactly the output of the top-level
+functionality. Thus the coupling preserves the joint corrupt view and honest
+output, not merely the marginal transcript. It holds for arbitrary choices
+of the corrupt subprotocol shares, including correlated, nonuniform choices.
+
+Given a coupled history, use the same next inputs and corrupt random coins
+in both executions. Fresh circuit-output shares can be coupled identically;
+DPF share selections then follow the same strategy on the same view.
+The complement identity completes the honest output for the next call.
+Induction proves the hybrid claim for polynomially many adaptive expansions.
+Routing failure is fixed during setup and is charged once per state.
+Replacing concrete subprotocol calls by their ideal calls and online
+simulators adds their accumulated joint simulation loss
+$\epsilon_{\mathsf{sub}}(B_0,Q)$. This loss includes any distinguishable
+failure of those realizations; the hybrid routing error remains separate.

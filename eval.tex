@@ -1,19 +1,28 @@
 \section{Evaluation}\label{sec:eval}
 
-We evaluate the practicality of our designs with a concrete implementation of the
-\emph{Reverse Cuckoo} DMPF (\sectionref{sec:revCuckoo}) integrated into a RingLPN-based
-PCG pipeline (\sectionref{sec:ringlpn}). %Our prototype is open-source at \url{https://github.com/osu-crypto/libOTe}. 
-In \sectionref{sec:RevCuckooPerf} we present just the cost to perform a Reverse Cuckoo DMPF with various parameters. In \sectionref{sec:pcgPerm} we present the full end to end costs of generating prime field OLEs and Beaver triples via the Ring LPN protocol combined with our Reverse Cuckoo DMPF.
+We measure an implementation of the \emph{Reverse Cuckoo} DMPF
+(\sectionref{sec:revCuckoo}) integrated into a Ring-LPN OLE pipeline
+(\sectionref{sec:ringlpn}). Waterfall's modeled costs appear separately in
+\sectionref{sec:waterfallParameters}.
+\sectionref{sec:RevCuckooPerf} measures the DMPF alone.
+\sectionref{sec:pcgPerm} measures the end-to-end Ring-LPN OLE pipeline
+and compares it with OLE and Beaver-triple baselines.
+
+All timings predate the AES rekeying in \appendixref{app:dpf-aes}.
+The OLE measurements also predate the per-expansion mask refresh in
+\sectionref{sec:stationary} and omit the support-rejection filter used by
+the current parameter recipe. The current implementation refreshes the
+masks, but the tables have not been remeasured. These results describe the
+earlier revision, not validation of the complete current recipe.
 
 \paragraph{Environment.}
-Benchmarks were run on a commodity laptop-class CPU (i7 13700H) with 32GB DDR5 memory. Communication was performed on a local socket with sub millisecond latency and +10Gbps. 
+Benchmarks used an i7-13700H CPU with 32\,GB DDR5 memory and local sockets
+with sub-millisecond latency and bandwidth above 10\,Gbps.
 All code was compiled with full optimizations (\texttt{-O3}, LTO) and native CPU tuning
-(\texttt{-march=native}). Results are single-threaded per party.\footnote{Multi-core
-throughput scales near-linearly until memory bandwidth effects dominate, which we leave to
-extended results.}
+(\texttt{-march=native}). Results are single-threaded per party.
 
 
-\subsection{Reverse Cuckoo Dmpf}\label{sec:RevCuckooPerf}
+\subsection{Reverse-Cuckoo DMPF}\label{sec:RevCuckooPerf}
 
 % Requires: \usepackage{booktabs}
 \begin{table}[t]
@@ -46,7 +55,7 @@ $2^{20}$ & 128 & 988.50 & 38.50 & 1104 & 3 \\
 % sum = 344.3 ms
 % %:   2.85,       1.02,           31.07,       29.04,         33.11,        2.91
 % segment centers (in %): 1.425, 3.36, 19.405, 49.46, 80.535, 98.545
-\begin{figure}[h]
+\begin{figure}[H]
   \centering
   
 \begin{tikzpicture}
@@ -82,25 +91,32 @@ $2^{20}$ & 128 & 988.50 & 38.50 & 1104 & 3 \\
 \end{axis}
 \end{tikzpicture}
 
-  \caption{The realative costs of the Reverse Cuckoo DMPF sub proceedures. Data taken for $n=2^{18}, t=128.$ Dedup+ denote deduplication, permuting and hashing. Solve is the binary system solver. Sparse Sets is the time requires to compute the sparse sets that are input to the Sparse Dpf. Sparse DPF is the time to evaluate the sparse tree and generate the leaf values. }
+  \caption{Reverse-Cuckoo DMPF setup breakdown at $n=2^{18},t=128$.
+  Dedup+ includes deduplication, permutation, and hashing. Solve is the binary
+  system solver. Sparse Sets constructs the public leaf domains; Sparse DPF
+  initializes the trees and leaf values.}
   \label{fig:bar}
   
 \end{figure}
 
-\tableref{tab:dmpf-time-split} and \figureref{fig:bar} report the setup and online (leaf expansion) performance of the Reverse Cuckoo DMPF across a range of parameters. As $n$ and $t$ increase, setup time grows as expected, but the per-expansion cost remains low and stable, with each online expansion taking just a few milliseconds even for large $n$. The results confirm that the bulk of computation is concentrated in the setup phase, while online expansions are efficient and suitable for high-throughput applications. This demonstrates the practicality of Reverse Cuckoo DMPF for scenarios that require fast, repeated expansions after a one-time setup cost.
+\tableref{tab:dmpf-time-split} reports setup times of 72.90--988.50\,ms
+and average expansion times of 1.37--38.50\,ms across the measured cases.
+Expansion time increases with the domain size. Setup remains more expensive
+than one expansion in every row, so reuse amortizes a substantial initial cost.
 
 
 
-\subsection{Ring LPN PCG}\label{sec:pcgPerm}
+\subsection{Ring-LPN OLE pipeline}\label{sec:pcgPerm}
 
 
 
-We now evaluate our implementation of the Ring LPN-based pseudorandom correlation generator (PCG) for OLEs and Beaver triples over prime finite fields $\mathbb{F}_q$, as described in \sectionref{sec:ringlpn}. Benchmarks are provided for our main construction (\RcDmpf) as well as relevant baselines, focusing on throughput and communication for generating OLE correlations over different fields and vector lengths.
+We generate OLE correlations over two prime fields. Goldilocks has modulus
+$q=2^{64}-2^{32}+1$, whose form permits efficient modular arithmetic
+\cite{goldilocks,goldilocks2}. Fp31 has modulus $q=15\cdot2^{27}+1$;
+we use Montgomery reduction for this field.
 
-We conider two prime fields. Goldilocks is a 64 bit prime $q= 2^{64} - 2^{32} + 1$ which has special form and highly efficient modular operations\cite{goldilocks,goldilocks2}. Fp31 refers to the 31 bit prime $q=15 \cdot 2^{27} + 1$ which we use montgomery reduction for.
 
-
-\begin{figure}[h]
+\begin{table}[H]
   \centering
 
 \begin{tabular}{|l l c | r r l l|}
@@ -114,7 +130,7 @@ Protocol & Field & $n$ & Setup time (s) & Median (op/s) & Setup comm & Expand co
 \RcDmpf&Goldilocks & $2^{18}$ & 3.558  & 1{,}579{,}180 & 158.92MB  & 12.99 MB  \\
 \RcDmpf&Goldilocks & $2^{20}$ & 12.490 & 1{,}811{,}012 & 170.44 MB & 12.99 MB \\\hline
 \cite{mp-spdz}&Goldilocks & $2^{20}$ & -- & 275,548 &-- & 176.65 MB \\\hline\hline
-\SumDmpf&Fp31       & $2^{16}$ & --  & 47,250 & -- & MB 12.14 \\\hline
+\SumDmpf&Fp31       & $2^{16}$ & --  & 47,250 & -- & 12.14 MB \\\hline
 \RcDmpf&Fp31       & $2^{16}$ & 2.258  & 1{,}260{,}307 & 143.04 MB & 6.51 MB  \\
 \RcDmpf&Fp31       & $2^{18}$ & 3.793  & 2{,}221{,}559 & 152.43 MB &  6.51 MB \\
 \RcDmpf&Fp31       & $2^{20}$ & 11.583 & 2{,}709{,}498 & 163.95 MB & 6.51 MB  \\\hline
@@ -122,13 +138,19 @@ Protocol & Field & $n$ & Setup time (s) & Median (op/s) & Setup comm & Expand co
 \hline
 \end{tabular}
 \caption{Ring LPN PCG performance and communication for generating OLE correlations. For each field and vector length $n$, we report the one-time setup latency (seconds), the median per-expansion throughput over 10 expansions (op/s), and the total communication summed over both parties: one-time setup bytes and per-expansion bytes. Communication is shown in MB (decimal). \SumDmpf refers to the ``sum  of DPFs'' approach and \RcDmpf is our new Reverse Cuckoo DMPF.  \cite{mp-spdz} generates Beaver triples and therefore we generated $n'=n/2$ triples for their numbers.}
-\label{fig:pcg}
+\label{tab:pcg}
   
-\end{figure}
+\end{table}
+
+The $n=2^{16}$ and $n=2^{18}$ Reverse-Cuckoo rows measure performance scaling;
+they are not claimed as 40-bit correctness parameter sets for the present
+degree-two feature evaluator.  \namedref{Proposition}{prop:rc-ringlpn-correctness}
+and \appendixref{app:revCuckooHash} certify the corresponding filtered
+$n=2^{20}$ caller distribution, not the measured unfiltered sampler.
 
 
 
-\begin{figure}[h]
+\begin{figure}[H]
   \centering
   
 \begin{tikzpicture}
@@ -149,11 +171,11 @@ Protocol & Field & $n$ & Setup time (s) & Median (op/s) & Setup comm & Expand co
 
 % Centered labels for each segment (positioned at segment midpoints)
 \node[font=\scriptsize] at (axis cs:  1.42,1) {};
-\node[font=\scriptsize] at (axis cs:  6.77,1) {Dedup+, Solve, Sparse Sets};
+\node[font=\scriptsize,anchor=south west,yshift=16pt] at (axis cs: 0,1) {Dedup+, Solve, Sparse Sets};
 \node[font=\scriptsize] at (axis cs: 13.30,1) {};
-\node[font=\scriptsize] at (axis cs: 56.72,1) {Sparse DPF 83.67\%};
+\node[font=\scriptsize] at (axis cs: 56.72,1) {Sparse DPF 84.11\%};
 %\node[font=\scriptsize] at (axis cs: 98.78,1) {Other 2.44\%};
-\node[font=\scriptsize] at (axis cs:102.32,1) {Expand 4.63\%};
+\node[font=\scriptsize,anchor=south east,yshift=16pt] at (axis cs:108,1) {Expand 4.63\%};
 
 % Stacked segments (percent widths; first 5 sum to 100)
 \addplot+[xbar] coordinates {( 2.84,1)};  % Dedup+
@@ -166,41 +188,53 @@ Protocol & Field & $n$ & Setup time (s) & Median (op/s) & Setup comm & Expand co
 \end{axis}
 \end{tikzpicture}
 
-  \caption{The realative costs of the Reverse Cuckoo DMPF based Ring LPN PCG compared to the online Expand time (4.6\%). Data taken for $n=2^{20}.$ Dedup+ denote deduplication, permuting and hashing. Solve is the binary system solver. Sparse Sets is the time requires to compute the sparse sets that are input to the Sparse Dpf. Sparse DPF is the time to evaluate the sparse tree and generate the leaf values. Expand denote the time required to expand one set of leaves to generate the noise vectors. }
+  \caption{Reverse-Cuckoo Ring-LPN setup breakdown at $n=2^{20}$, with one
+  expansion shown relative to setup time. Dedup+ includes deduplication,
+  permutation, and hashing. Solve is the binary system solver. Sparse Sets
+  constructs the public leaf domains; Sparse DPF initializes the trees and
+  leaf values. The expansion measurement predates the fresh-mask update.}
   \label{fig:barPcg}
   
 \end{figure}
 
 
 \paragraph{Results summary.}
-\tableref{fig:pcg} reports wall-clock setup time, median expansion throughput, and
-(two-party) communication. We observe three consistent trends. First, the online
-throughput improves with $n$: for Goldilocks the median rises from
-$0.89{\times}10^6$ to $1.58{\times}10^6$ to $1.81{\times}10^6$ ops/s as
-$n$ grows from $2^{16}$ to $2^{20}$; for $\mathbb{F}_{p_{31}}$ it rises
-from $1.26{\times}10^6$ to $2.22{\times}10^6$ to $2.71{\times}10^6$ ops/s. For larger $n$ the current implementation runs out of memory when allocating space to evaluate all of the Sparse DMPFs. Increased memory or a more careful implementation could mitigate this.
+At $n=2^{20}$, measured throughput is 1.81 million OLEs/s in Goldilocks
+and 2.71 million OLEs/s in Fp31. Relative to the measured
+\cite{mp-spdz} baseline, these are throughput factors of 6.57 and 8.75.
+Per-expansion communication is smaller by factors of 13.60 and 27.12.
+These ratios exclude Reverse-Cuckoo setup and use the conversion of one
+Beaver triple to two OLEs stated in the table caption.
 
-Second, the $\mathbb{F}_{p_{31}}$ pipeline is consistently faster online
-(about $1.4\!\times$-$1.5\!\times$ higher median ops/s than Goldilocks at the
-same $n$) while also using less setup communication (e.g., $1.69$\,GB vs.\ $2.02$\,GB at $n{=}2^{20}$). This difference would be larger if not for the exceptional efficency of the Goldilocks field\cite{goldilocks,goldilocks2}.
-Third, per-expansion communication is modest ($\approx$6-13\,MB) and does not grow with $n$.
-
-We also compare to the \SumDmpf approach and \cite{mp-spdz}. The \SumDmpf baseline provides lower throughput (e.g., $37,686$ ops/s at $n=2^{16}$ in Goldilocks, and $47,250$ ops/s in Fp31) and lacks a setup phase, making it less practical for applications requiring high rates. \cite{mp-spdz}, measured in terms of OLE generation, achieves $275{,}548$ (Goldilocks) and $309{,}588$ (Fp31) ops/s at $n=2^{20}$ with substantially higher per-expansion communication than our \RcDmpf. In both fields, our \RcDmpf protocol achieves an order of magnitude higher throughput and lower communication than these alternatives, especially in the online (expansion) phase.
+At $n=2^{16}$, the throughput factors over \SumDmpf are 23.50 and 26.67.
+Goldilocks expansion communication is slightly higher, not lower:
+12.99\,MB versus 12.4\,MB. Fp31 uses 6.51\,MB versus 12.14\,MB.
 
 \paragraph{Where setup time goes.}
-The stacked bar in \figureref{fig:bar} (Reverse Cuckoo DMPF) and the
-Goldilocks $n{=}2^{20}$ bar with a single expansion overlay
-(\figureref{fig:barPcg}) tell a consistent story: \emph{Sparse DPF expansion of
-the sparse tree dominates setup}. For Goldilocks at $n{=}2^{20}$, Sparse~DPF accounts for
-$\approx$82\% of setup time, the linear \emph{Solve} step is $\approx$8\%, the
-\emph{Sparse Sets} construction is $\approx$5\%, and \emph{Dedup+} (dedup/perm/hash)
-is $\approx$3\% (the remainder is minor bookkeeping). The difference between the two bar charts is large because the PCG parameters are more sparse and many instances are evaluated in concurrently, hurting memory locality.
+In the $n=2^{20}$ PCG breakdown, sparse-tree initialization accounts for
+84.11\% of setup time, compared with 7.86\% for solving and 5.19\% for
+constructing sparse sets. The remaining 2.84\% covers deduplication,
+permutation, and hashing. These are measured implementation costs, distinct
+from the logical OT counts used to compare Waterfall profiles.
 
-\paragraph{Online vs.\ offline cost at $n=2^{20}$ (Goldilocks).}
-For $n=2^{20}$ in the Goldilocks field, our \RcDmpf implementation achieves a median expansion throughput of $1,811,012$ ops/s, with a one-time setup cost of $12.49$~s. Each expansion requires $12.99$~MB of communication, while setup communication totals $170.44$~MB. For comparison, \cite{mp-spdz} achieves $275,548$~ops/s and $176.65$~MB expand comm but no reported setup. The \SumDmpf approach is much slower ($37,686$~ops/s, $12.4$~MB comm). Thus, after as few as 10 expansions, the cumulative online cost is still less than the setup, and \RcDmpf outperforms both alternatives on throughput and total bytes.
+\paragraph{Setup amortization.}
+Consider the Goldilocks row at $n=2^{20}$.
+Setup takes 12.49\,s and communicates 170.44\,MB. After $Q$ expansions, total measured communication in MB is
+\[
+ 170.44+12.99Q.
+\]
+For example, $Q=10$ gives 300.34\,MB.
+Each expansion still communicates. The throughput column excludes setup,
+so an application should account for its intended number of expansions.
+We do not infer total-byte savings over the smaller-domain \SumDmpf row.
 
-\paragraph{Impact of field choice.}
-Switching to $\mathbb{F}_{p_{31}}$ improves online throughput at every $n$. For example, at $n=2^{20}$ the \RcDmpf achieves $2.71$~M ops/s and $6.51$~MB/expansion in Fp31, compared to $1.81$~M ops/s and $12.99$~MB/expansion in Goldilocks. Setup bytes are also lower in Fp31 ($163.95$~MB vs. $170.44$~MB). The \SumDmpf and \cite{mp-spdz} baselines also show slightly better throughput in Fp31 but remain far below \RcDmpf. Since per-expansion bytes are stable (and even lower in Fp31), using $\mathbb{F}_{p_{31}}$ is preferred for applications that tolerate a smaller field, giving higher speed and reduced bandwidth.
+\paragraph{Field choice.}
+Fp31 setup communicates 163.95\,MB at $n=2^{20}$;
+Goldilocks setup communicates 170.44\,MB.
+Fp31 also has higher measured throughput and a smaller expansion payload.
+These differences illustrate the arithmetic tradeoff. A smaller field is
+appropriate only when the application's correctness and security requirements
+permit it.
 
 
 

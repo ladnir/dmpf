@@ -4,24 +4,43 @@
 
 \subsection{Notation}
 
-For integers $m, n \in \mathbb{Z}$, we denote by $[m,n]$ the  set of integers $\{m,m+1,m+2,\ldots,n\}$ and $[n]$ be the shorthand for $[1,n]$. We use $\kappa$ to denote the statistical security parameter, e.g., $\lambda=40$. Parties are denoted as $P_0,P_1$. We use $x:=3$ to assign the variable $x$ the value $3$. We use $x=3$ to denote mathematical equality or in the case of an alogirthm the predicate that is 1 if $x$ has value $3$ and 0 otherwise.
+For integers $m\leq n$, let $[m,n]:=\{m,\ldots,n\}$ and
+$[m,n):=\{m,\ldots,n-1\}$. In particular,
+$[0,n)=\{0,1,\ldots,n-1\}$, whereas $[n]:=[1,n]$ is one-based.
+We write index ranges explicitly when addressing bins, blocks, or tree nodes.
+The computational security parameter is $\kappa$; $\lambda$ controls
+statistical error. Our concrete examples use $\kappa=128$ and $\lambda=40$.
+The parties are $P_0,P_1$.
+We use $:=$ for deterministic assignment and $\gets$ for sampling.
+An indicator $[E]$ is one when predicate $E$ holds and zero otherwise.
 
 
 
-We denote by \share{x} a secret sharing of the value $x$, and by $\share{x}_i$ the share held by party $P_i$. We will assume that shares are either binary, meaning $x=\share{x}_0\oplus \share{x}_1$, or arithmatic in the ring $\mathbb{Z}_{2^n}$, meaning $x=\share{x}_0+\share{x}_1\in \mathbb{Z}_{2^n}$. We note that other sharing types are possible. When ambigous, we use the notation $\share{x}\in \mathbb{G}$ to denote that the value is shared over the group $\mathbb{G}$.
+We denote a sharing of $x$ by $\share x$ and the share held by $P_i$
+by $\share x_i$. Binary sharing means $x=\share x_0\oplus\share x_1$.
+For a finite additive group $\mathbb G$, additive sharing means
+$x=\share x_0+\share x_1\in\mathbb G$.
+The notation $\share x\in\mathbb G$ specifies the reconstructed value's
+domain. A shared public constant uses a fixed local sharing known to both
+parties. Ideal circuit and permutation calls return fresh random shares
+unless their interfaces state otherwise. The DPF and DMPF functionalities
+instead let the corrupt party choose its output share and return the
+complementary share to the honest party.
 
 \subsection{Functions}
 We make use of the following helper functions (inputs may be secret-shared unless noted).
 
 \begin{itemize}
-  \item $\decomp_w:\ \GG \rightarrow \FF_w^{\,n}$, where $n:=\log_w(|\GG|)$, returns the base-$w$ digit vector
-  $b=(b_1,\ldots,b_n)$ such that $a=\sum_{i=1}^n w^{i-1} b_i$. (Assume $w\ge 2$ and that $|\GG|=w^n$ or we fix a canonical embedding of $\GG$ into $\ZZ_{w^n}$.)
+  \item $\decomp_w:[0,w^D)\to[0,w)^D$ returns the $D$ base-$w$ digits
+  of an integer, for public integers $w\geq2$ and $D\geq1$.
+  Thus $a=\sum_{i=1}^D w^{i-1}b_i$. Protocol boxes specify the digit order
+  when assigning these outputs.
 
   \item $\unitVec_{S}:\ (\,\alpha\in S,\ \beta\in \GG\,)\ \rightarrow\ \GG^{S}$, where
   $v=\unitVec_{S}(\alpha,\beta)$ satisfies $v_\alpha=\beta$ and $v_j=0$ for $j\in S\setminus\{\alpha\}$.
 
-  \item $\append:\ X^{n}\times X^{m}\ \rightarrow\ X^{n+m}$, concatenation:
-  $\append((x_1,\ldots,x_n),(y_1,\ldots,y_m))=(x_1,\ldots,x_n,y_1,\ldots,y_m)$. We also use the notation $||$ to have the same meaning but as an infix operator.
+  \item $\append:X^n\times X^m\to X^{n+m}$ concatenates two sequences.
+  We also write $x\Vert y$ for the same operation.
 
   \item $\sort:\ X^{n}\times \{\text{total order }\prec\}\ \rightarrow\ (X^{n},\pi)$.
   Given a sequence and a comparator, outputs the \emph{stably} sorted sequence (ascending under $\prec$) and the permutation
@@ -34,7 +53,27 @@ We make use of the following helper functions (inputs may be secret-shared unles
   The choice is public and fixed by parameters; security only requires that outputs are computationally indistinguishable from random in~$\GG$ given random inputs.
 
   \item $\shuffle:\ X^{n}\ \rightarrow\ X^{n}$ samples a uniform $\pi\gets S_n$ and returns
-  $(x_{\pi(1)},\ldots,x_{\pi(n)})$. In MPC we implement this as a data-oblivious random permutation (coin-tossing to agree on $\pi$).
+  $(x_{\pi(1)},\ldots,x_{\pi(n)})$.
+  On shared inputs, this denotes an ideal functionality: reconstruct the
+  records internally, sample $\pi$, and return fresh shares of the permuted
+  records. Neither party receives $\pi$.
+  A named reusable instance $\mathsf{Shuf}$ samples and retains $\pi$ on
+  $\mathsf{Setup}$; each $\mathsf{Expand}$ applies that same permutation to a
+  new shared vector and returns fresh shares. Both methods return the
+  permuted vector; repeated setup or expansion before setup returns $\bot$.
+  Aligned record fields use the same permutation.
+
+  \item $\mathsf{reshare}(\share x\in\mathbb G)\to\share x$ denotes the
+  ideal identity circuit with fresh additive output shares. It reconstructs
+  $x$ internally, samples $r\gets\mathbb G$, and returns $r,x-r$.
+  No reconstructed value is opened.
+
+  \item $\mathsf{permute}$ denotes an ideal privately controlled permutation:
+  one designated party supplies $\pi$, the parties supply shared records,
+  and the functionality returns fresh shares of their permutation.
+  Only the designated party knows $\pi$. A named instance retains it for
+  inverse calls. Composing one such instance per party gives the two
+  serial hidden passes used by Waterfall.
 
   \item $\zip:\ X_1^{n}\times \cdots \times X_k^{n}\ \rightarrow\ (X_1\times\cdots\times X_k)^{n}$, denote the ``zip'' operator
   $\zip(\vec{x}^{(1)},\ldots,\vec{x}^{(k)})=((x^{(1)}_1,\ldots,x^{(k)}_1),\ldots,(x^{(1)}_n,\ldots,x^{(k)}_n))$.
@@ -42,10 +81,10 @@ We make use of the following helper functions (inputs may be secret-shared unles
 
   \item $\powerset:\ 2^{U}\rightarrow 2^{2^{U}}$ is the usual power-set operator, returning the set of all subsets of~$U$.
 
-  \item $\G:\ \{0,1\}^{\kappa}\ \rightarrow\ (\{0,1\}^{\kappa})^{b}\times\{0,1\}^{\sigma}$ is the PRG used in the DPF tree.
-  For branching factor $b$ (binary $b{=}2$ in our base construction), $\G(s)$ outputs the $b$ child seeds
-  $(s_1,\ldots,s_b)$ and auxiliary bits/blocks $\xi\in\{0,1\}^{\sigma}$ (used for masks/correction words). We write
-  $(s_1,\ldots,s_b,\xi)\gets \G(s)$ and apply this independently at each internal node during expansion.
+  \item $\G:\{0,1\}^{\kappa}\to(\{0,1\}^{\kappa})^w$ is the tree PRG
+  for branching factor $w$. Each child seed includes its tag as its least
+  significant bit. The protocol extracts these bits; $\G$ has no separate
+  auxiliary output.
 \end{itemize}
 
 
@@ -59,14 +98,16 @@ Function Secret Sharing (FSS) provides short keys that secret-share the evaluati
 DPFs have been used as a backbone for two-server PIR and anonymous write/read systems (e.g., Riposte), where a client encodes a unit vector query/update via DPF keys \cite{corrigan2015riposte}. In private telemetry and measurement, Prio and successors (VDAF) use DPF-style ideas to aggregate client data while preserving privacy and enabling robustness/verification \cite{prio,vdaf}. Recent systems also study aggregation of high-dimensional sparse vectors with DPF-based encodings \cite{asi2025preamble} and incremental/offline-online PIR updates compatible with DPF pipelines \cite{inc-offline-online-pir}. Our setting differs: we compress and \emph{multiply} sparse structures arising inside PCGs—hence the need for DMPFs rather than per-point DPF summation.
 
 \paragraph{DMPFs and big-state constructions.}
-DMPFs can be viewed as an instance of earlier FSS-for-batch-codes constructions \cite{fssBatchCodes}. More recently, DMPFs were explicitly identified and optimized, with cuckoo-style schemes and big-state variants providing sublinear domains for sub-instances \cite{dmpf}. Our Reverse Cuckoo turns the usual table-building on its head: we fix a target bin assignment first and then solve (and reveal) small linear systems that act as hash function descriptors; this avoids iterative evictions in MPC while preserving cuckoo-style load properties. We also give bucketing and big-state keygen paths that trade structure for very simple distributed key generation.
+DMPFs can be viewed as an instance of earlier FSS-for-batch-codes constructions \cite{fssBatchCodes}. More recently, DMPFs were explicitly identified and optimized, with cuckoo-style schemes and big-state variants providing sublinear domains for sub-instances \cite{dmpf}.  Our Waterfall construction retains the cuckoo-style sparse layout but uses an input-independent candidate matrix with a fixed scan and bounded complete repair.  We also give bucketing and big-state key-generation paths, and later isolate Reverse Cuckoo as a Ring-LPN-specific optimization rather than a generic DMPF.
 
 \paragraph{PCGs from LPN/Ring-LPN and beyond.}
-PCGs unify many preprocessing correlations for MPC and were introduced as a unifying abstraction by Boyle et al.\ \cite{pcg2019}. Ring-LPN PCGs first achieved silent OLE/triples from structured noise \cite{boyle2020efficient}, with later generalizations to arbitrary fields and to $\mathbb{Z}/p^k\mathbb{Z}$ \cite{anyField,pcgZ2k}. Beyond LPN-based assumptions, Bombar et al.\ introduced programmable PCGs from the quasi-abelian syndrome decoding (QA-SD) problem \cite{pcgQASD}. Recent high-throughput Boolean PCGs (e.g., FOLEAGE) highlight how practical pipelines are gated by multi-point encodings in their sparsity steps \cite{foleage}. Our distributed DMPFs replace the status-quo “sum of $t$ DPFs,” eliminating the $O(\kappa)$ multiplicative overhead per correlation and aligning Ring-LPN PCG costs with the OT/VOLE case.
+PCGs unify many preprocessing correlations for MPC and were introduced as a unifying abstraction by Boyle et al.\ \cite{pcg2019}. Ring-LPN PCGs first achieved silent OLE/triples from structured noise \cite{boyle2020efficient}, with later generalizations to arbitrary fields and to $\mathbb{Z}/p^k\mathbb{Z}$ \cite{anyField,pcgZ2k}. Beyond LPN-based assumptions, Bombar et al.\ introduced programmable PCGs from the quasi-abelian syndrome decoding (QA-SD) problem \cite{pcgQASD}. Recent high-throughput Boolean PCGs (e.g., FOLEAGE) highlight how practical pipelines are gated by multi-point encodings in their sparsity steps \cite{foleage}. Our DMPFs reduce the number of domain traversals used to encode sparse vectors. Transferring this improvement to a particular PCG requires checking its noise distribution and security assumptions.
 
 \paragraph{Implementation of PCGs.}
-The Silentium system \cite{silentium} provides the first large-scale implementation of the Bt-PCG for Beaver triples, demonstrating feasibility of the Boyle et al.\ design and showing concrete speedups ($\approx34\%$ over MP-SPDZ LowGear) together with dramatic communication savings. Silentium focuses on engineering challenges: synchronizing SUV generation, optimizing 128-bit NTTs of degree $2^{20}$, and parallelizing PRG invocations. In contrast, our work advances the algorithmic foundation: DMPFs accelerate the sparse encodings underlying \emph{all} PCGs, not just Bt-PCG, yielding order-of-magnitude gains both in throughput and in communication. Whereas Silentium demonstrates practicality of an existing construction, our results redefine the underlying primitives so that PCGs across domains inherit these improvements.
+Silentium \cite{silentium} implements a PCG for Beaver triples.
+Our evaluation instead measures the Reverse-Cuckoo Ring-LPN pipeline over
+two prime fields, with the baselines and setup exclusions stated in
+\sectionref{sec:eval}. We do not claim the same gains for every PCG.
 
 \paragraph{Cuckoo hashing and stash bounds.}
-We rely on classical cuckoo hashing analysis and its “stash” refinements to argue negligible failure probability with small constant stash; these also justify our use of $w$ independent systems and the permutation-consistency viewpoint \cite{cuckoo,kirsch2010more,DBLP:journals/corr/abs-1204-4431}. For set-based cryptographic protocols (e.g., PSI), cuckoo hashing is now standard, and circuit/OPPRF-based PSI variants analyze similar load/failure profiles that our Reverse Cuckoo mirrors while removing kick-out dynamics in MPC \cite{pinkas2018efficient,demmler2018pir,yeo2025private}.
-
+We rely on classical cuckoo hashing analysis and its stash refinements to bound the correctness error of fixed Waterfall configurations \cite{cuckoo,kirsch2010more,DBLP:journals/corr/abs-1204-4431}. For set-based cryptographic protocols such as PSI, cuckoo hashing is now standard, and circuit/OPPRF-based PSI variants analyze related load and failure profiles \cite{pinkas2018efficient,demmler2018pir,yeo2025private}.

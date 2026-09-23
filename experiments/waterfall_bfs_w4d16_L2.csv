@@ -1,0 +1,4 @@
+t,w,d,c,policy,evictions,conditioned_samples,conditioning_event,exact_initial_overflow,exact_initial_overflow_log2,conditional_failure,conditional_failure_log2,failure_estimate,failure_estimate_log2,standard_error,relative_standard_error,log2_standard_error,failure_effective_sample_size,nonzero_failure_matrices,structural_failure_matrices
+16,4,16,0,bfs,2,500000,L_w=2,4.443590944454071e-09,-27.74562683869255,6.6e-05,-13.88717444996572,2.9327700233396873e-13,-41.63280128865827,5.105133938746395e-14,0.17407208537043528,0.25113293432112727,33.0,33,33
+16,4,16,0,bfs,3,500000,L_w=2,4.443590944454071e-09,-27.74562683869255,0.0,-inf,0.0,-inf,0.0,inf,inf,0.0,0,0
+16,4,16,0,bfs,4,500000,L_w=2,4.443590944454071e-09,-27.74562683869255,0.0,-inf,0.0,-inf,0.0,inf,inf,0.0,0,0

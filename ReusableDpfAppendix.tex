@@ -1,0 +1,331 @@
+\section{Reusable DPF Simulation}
+\label{app:reusable-dpf-simulation}
+
+We first simulate two random-value hybrids of
+\namedref{Figures}{fig:Dpf} and~\ref{fig:sparseDpf}. We then reduce the real
+protocol to these hybrids under explicit tree-generator and leaf-PRF
+requirements. The reductions concern the abstract generators in the figures;
+they do not establish those requirements for a particular AES evaluator.
+Fix a static semi-honest corrupt party $P_b$, $b\in\{0,1\}$, and put
+$h:=1-b$. Shared selections, products, and digit decomposition are ideal
+circuit calls. Their fresh secret-output shares are uniform; the simulator
+computes local operations and repeated uses of those shares consistently.
+
+\subsection{Setup with independent honest active children}
+
+Define the \emph{independent-child experiment} by changing only the honest
+party's expansion of an active parent: replace that invocation of
+$\mathsf G$ by $w$ fresh independent $\kappa$-bit children. Root-child shares
+are already sampled directly. Keep every corrupt-party evaluation and every
+off-path expansion unchanged.
+The active node and the replacements are defined using the hidden index
+inside the experiment; the simulator is not given that index.
+
+\begin{lemma}[Correction-word distribution]
+\label{lem:dpf-correction-distribution}
+In the independent-child experiment, conditioned on the corrupt view before
+each correction, the public correction has the following law, independent
+of the secret child number:
+\begin{enumerate}
+ \item For binary branching, sample $a\gets\{0,1\}^{\kappa-1}$ and
+ $\tau_1,\tau_2\gets\{0,1\}$ independently, and return
+ $(a\Vert\tau_1,a\Vert\tau_2)$.
+ \item For $w>2$, return $w$ independent $\kappa$-bit blocks.
+\end{enumerate}
+At an active split, the corrected honest active seed has a uniform
+$(\kappa-1)$-bit prefix conditioned on the corrupt view after the correction
+and on the secret child number.
+\end{lemma}
+
+\begin{proof}
+Fix the corrupt pre-correction view and the secret digit $u\in[0,w)$.
+At an active split, cancellation of off-path parents makes the reconstructed
+child sums $z_1,\ldots,z_w$ the XORs of the active parent's two sets of
+children. The honest children are independent uniform blocks, so these sums
+are independent uniform blocks even after fixing the corrupt children.
+
+For $w=2$, \figureref{fig:correction} reveals
+\[
+ a=\msbs(z_{2-u}),\qquad
+ \tau_1=\lsb(z_1)\oplus u\oplus1,\qquad
+ \tau_2=\lsb(z_2)\oplus u.
+\]
+These are independent uniform values. The prefix of $z_{1+u}$ is unused
+by this disclosure. The corrected honest active prefix is that unused
+prefix XOR a value fixed by the corrupt children, their parent tag, and
+$a$. It therefore remains uniform after the disclosure. The active tag is
+determined by correctness and is not claimed to be hidden.
+
+For $w>2$, let $r\gets\{0,1\}^{\kappa-1}$ be the fresh reconstructed mask.
+The correction is
+\[
+ \sigma_j=z_j\oplus[j=1+u](r\Vert1),\qquad j\in[1,w].
+\]
+For every fixed $r$, this is a bijection on the uniform tuple of child
+sums. Thus the correction tuple is uniform and independent of $r$.
+Conditioned on that tuple, the corrected honest active prefix is $r$ XOR
+the corrected corrupt active prefix, so it is uniform.
+
+At a sparse binary level with no active split, the reconstructed child sums
+are zero. \figureref{fig:sparseDpf} replaces them by the independent uniform
+mask $r$ before computing the correction. The binary correction therefore
+has the same law at such a level. No active seed is changed there. Ideal
+circuit-output shares add only independent local shares; deterministic
+dependencies between local correction components are retained.
+\end{proof}
+
+The setup simulator now follows the public schedule. It samples the corrupt
+root shares and the fresh output shares of ideal circuit calls. At each
+visited split it samples the public correction according to
+\namedref{Lemma}{lem:dpf-correction-distribution}. It computes the corrupt party's
+local correction shares from its simulated state, and supplies their XOR
+complement as the honest opening message. It then performs the corrupt
+party's actual local corrections and generator evaluations. For sparse
+trees, the visited split bits depend only on $S$; the correction law does
+not reveal whether the active path splits at a visited bit.
+
+Induction over this schedule gives the exact corrupt setup-view distribution
+in the independent-child experiment, for either corruption choice. The
+simulator saves its computed leaf seeds and counter. It does not need the
+honest index to select a path or to construct those local seeds.
+
+\subsection{Expansion with a fresh honest active value}
+
+Fix a setup state satisfying the leaf invariant. For $x\in S$, write
+$t_p(x):=\lsb(\share{s_x}_p)$ and let $u_p(x)\in\mathbb G$ denote the signed
+leaf conversion of party $p$. Off the active address $\alpha$, the two tags
+agree and $u_0(x)+u_1(x)=0$.
+
+Define the \emph{fresh-active-value experiment} by replacing only the honest
+conversion $u_h(\alpha)$ in each expansion with a fresh uniform element of
+$\mathbb G$, independent of the history and current inputs. All corrupt
+conversions are still computed from the saved seeds with the public
+$\mathsf L_q$. Honest off-path conversions remain their negatives. The
+replacement is a distributional hybrid; it is not an extra protocol step.
+
+\begin{lemma}[Online leaf-update simulation]
+\label{lem:dpf-leaf-update-simulation}
+In the fresh-active-value experiment, the expansion messages and corrupt
+output can be simulated exactly from the corrupt local state and payload
+share. The honest output equals the complement prescribed by
+$\mathcal F_{\mathsf{rDPF}}$. The same simulator works online for
+polynomially many adaptive expansions without changing the saved seeds.
+\end{lemma}
+
+\begin{proof}
+Let $\eta:=t_0(\alpha)-t_1(\alpha)\in\{-1,1\}$, where the tags are
+interpreted as integers. The correctness calculation gives the opened value
+\[
+ \gamma=\eta\bigl(\beta-u_0(\alpha)-u_1(\alpha)\bigr).
+\]
+Fix the preceding history, the current inputs, and the corrupt conversions.
+The remaining honest active value is uniform. Translation and multiplication
+by either sign are bijections of $\mathbb G$, so $\gamma$ is uniform and
+independent of that fixed information.
+
+The simulator computes all $u_b(x)$ and $t_b(x)$ from its saved state and
+samples $\gamma\gets\mathbb G$. In characteristic two, the corrupt opening
+share is the locally computed
+$\gamma_b:=\share\beta_b-\sum_{x\in S}u_b(x)$.
+In other characteristics, the simulator computes the corrupt sign-bit share
+from its tags, and samples its fresh output share $\gamma_b$ from the ideal
+sign-multiplication call. In either case, it supplies
+$\gamma-\gamma_b$ as the honest opening message. These are the exact
+opening-share distributions in the stated experiment.
+
+It computes and submits the map
+\[
+ y_b(x):=u_b(x)+(1-2b)\gamma t_b(x),\qquad x\in S,
+\]
+to $\mathcal F_{\mathsf{rDPF}}$. Off $\alpha$, the two corrected values
+cancel. At $\alpha$, their sum is
+$u_0(\alpha)+u_1(\alpha)+\eta\gamma=\beta$.
+The honest map is consequently $\mathsf{pt}_S(\alpha,\beta)-y_b$,
+exactly as returned by the functionality. This proves the joint-output
+claim. At the next call the simulator retains the same seeds, increments
+$q$, and uses fresh simulation randomness. The fresh honest active value
+has the same conditional law for every ensuing choice of payload; induction
+proves the adaptive claim. A singleton uses the ideal identity circuit
+instead: sample its corrupt output share and submit it to the functionality.
+\end{proof}
+
+\subsection{Generator requirements and reductions}
+
+Let $H_0$ be the real generator-based protocol with ideal shared-circuit
+calls. Let $H_1$ make the independent-child replacements during setup,
+and let $H_2$ additionally make the fresh-active-value replacements during
+expansion. The lemmas above give an exact online simulator for $H_2$.
+We justify the transitions using the following two primitive requirements.
+
+For the tree generator, define
+$\mathsf G_\theta(k):=\mathsf G(k\Vert\theta)$ for
+$k\in\{0,1\}^{\kappa-1}$ and $\theta\in\{0,1\}$.
+The challenge algorithm chooses $\theta$ before receiving either
+$\mathsf G_\theta(K)$ for $K\gets\{0,1\}^{\kappa-1}$, or $w$ independent
+uniform $\kappa$-bit blocks. It does not receive $K$.
+Let $\epsilon_{\mathsf G}$ bound its distinguishing advantage.
+Its preceding state is independent of $K$, and it may evaluate the public
+generators on inputs of its choice. This requirement includes knowledge of
+the tag; ordinary PRG security for an unrestricted seed does not imply it.
+
+For leaf conversion, use the PRF option
+$\mathsf L_q(k):=\mathsf L(q,k)$ from \sectionref{sec:dpf}.
+Let $\epsilon_{\mathsf L}(Q)$ bound the advantage of distinguishing
+oracle access to $\mathsf L(\cdot,K)$ from a random function into
+$\mathbb G$, for a uniform secret key $K$ and at most $Q$ queries.
+The algorithm may also evaluate the public family under chosen keys.
+This is one joint requirement across rounds, not a separate assumption
+for each $q$. Both primitive bounds below are evaluated at the runtime of
+the external distinguisher plus one execution of the protocol and its
+ideal circuits.
+
+\begin{theorem}[Reusable DPF simulation]
+\label{thm:reusable-dpf-simulation}
+Fix valid public parameters and a nonempty support $S$. Let $a_S$ bound
+the number of active-parent calls to $\mathsf G$ after the directly sampled
+root children, maximized over $\alpha\in S$.
+Under the two primitive requirements above, the standard and sparse DPF
+protocols realize $\mathcal F_{\mathsf{rDPF}}$ against static semi-honest
+corruption for $Q$ polynomially many adaptive expansions, with advantage
+\[
+ \epsilon_{\mathsf{DPF}}(Q)
+ \leq a_S\epsilon_{\mathsf G}+\epsilon_{\mathsf L}(Q)
+       +\epsilon_{\mathsf{circuit}}(Q),
+\]
+where $\epsilon_{\mathsf{circuit}}(Q)$ is the accumulated joint simulation
+loss of the shared-circuit realizations. For a nontrivial standard tree,
+$a_S\leq D-1$; for a sparse binary tree,
+$a_S\leq\min\{D-1,|S|-2\}$. A singleton needs only the ideal identity
+circuit and incurs neither generator term.
+\end{theorem}
+
+\begin{proof}
+First replace active-parent expansions in root-to-leaf order. Consider
+two adjacent experiments, differing only at the next active parent.
+All earlier active expansions have independent children.
+\namedref{Lemma}{lem:dpf-correction-distribution} makes this parent's honest
+prefix a uniform secret $K$, independent of the preceding corrupt view.
+Its tag $\theta$ is fixed by the corrupt tag and the active path.
+
+The reduction runs the external distinguisher and the surrounding execution,
+including the honest inputs. Unlike the final simulator, it therefore
+knows the active path. It leaves $K$ implicit in the honest parent state,
+chooses $\theta$, and uses its challenge as that parent's children.
+This embedding does not require $K$: at the preceding correction, the
+honest active prefix was uniform and unexposed. In the binary case its
+prefix was unused by the correction; in the wider case the fresh mask
+made it independent of the correction. Local ideal-output shares can be
+sampled without exposing that prefix.
+The parent is used only for this expansion. All off-path seeds are
+computable from the corrupt state, and all subsequent children are
+computable from the challenge. Earlier honest parents are not needed again.
+If the path has no such call, the adjacent experiments coincide.
+
+The reduction follows all later corrections and expansions, and returns
+the external distinguisher's bit. It obtains honest output maps from
+correctness and the computed corrupt maps, preserving the joint external
+execution. A real challenge gives the earlier experiment; a uniform
+challenge gives the later experiment. There are at most $a_S$ transitions,
+each using one challenge, so their total loss is at most
+$a_S\epsilon_{\mathsf G}$.
+
+In $H_1$, the final honest active prefix $K$ is uniform and independent
+of the corrupt setup view. For $H_1$ to $H_2$, a second reduction leaves
+that prefix implicit and uses its PRF oracle for every honest active
+leaf conversion. It generates the setup view by the exact setup simulation
+above. It computes all corrupt conversions locally; honest off-path
+conversions are their negatives. On call $q$, it queries its oracle at
+$q$, applies the honest party's sign, and performs the leaf update.
+The hidden prefix has no other post-setup use. The reduction can generate
+the opening messages and both output maps without knowing that prefix.
+
+A real PRF oracle gives $H_1$. A random-function oracle gives $H_2$,
+because the stored counter never repeats an input. The reduction makes
+at most $Q$ queries and returns the external distinguisher's bit.
+It receives payloads as the execution proceeds, so their dependence on
+earlier honest outputs does not change the reduction. This transition
+costs $\epsilon_{\mathsf L}(Q)$, with no additional factor of $Q$.
+Neither reduction rewinds or aborts. The exact simulator for $H_2$ and
+composition with the shared-circuit simulators give the stated bound.
+\end{proof}
+
+\subsection{Concrete AES evaluators}
+\label{app:dpf-aes}
+
+The theorem does not require fresh public randomness during expansion.
+A concrete AES instantiation must justify its tree evaluator, stored-seed
+representation, and leaf evaluator, accounting for forward and inverse
+queries, collisions, and domain separation.
+
+\paragraph{Existing libOTe evaluator.}
+For dense expansion, we retain an AES-based evaluator from earlier
+\texttt{libOTe} code~\cite{libOTe}. This is an inherited implementation
+choice, not a new tree-generator design. With public AES key $k$ and seed
+$s\in\{0,1\}^{128}$, it computes
+\[
+ t:=\mathsf{AES}_k(s),\qquad
+ \bigl(\mathsf{AESRound}(t,s),\mathsf{add64x2}(t,s)\bigr).
+\]
+Here $\mathsf{AESRound}$ is one AES round, including its round-key XOR;
+$\mathsf{add64x2}$ adds the two 64-bit lanes separately modulo $2^{64}$.
+We conjecture that this optimization preserves DPF privacy. Related work on
+expand-accumulate codes conjectures punctured-function unpredictability for
+$(P(s)\oplus s,P(s)+s\bmod 2^\kappa)$ with ideal permutation
+$P$~\cite[Section~6.2, Conjecture~6.4]{pcgExpandAccumulate}.
+The evaluator's additional AES round is intended to disrupt that candidate's
+direct bit and carry relations. Neither ideal AES nor the cited analysis
+proves this evaluator secure or instantiates the theorem above.
+
+For sparse binary expansion, define
+$H_k(s):=\mathsf{AES}_k(s)\oplus s$ for $s\in\{0,1\}^{128}$.
+The children are $(H_k(s),H_k(s\oplus1))$, where $1$ is the block whose
+only set bit is the low bit. The dense kernel exports its corrected seed
+$s$ through $\mathsf{AESRound}(s,s)$ before the sparse interface.
+The reusable sparse interface stores a 127-bit seed prefix and a separate
+tag; leaf conversion pads the prefix with a zero low bit.
+These representation steps are also part of the concrete instantiation.
+The rekeying schedules below retain the existing child-generation formulas.
+
+\paragraph{Internal-node rekeying.}
+Setup derives purpose-separated public 128-bit roots from its agreed public
+coins. Dense and sparse expansion use separate roots, as do Waterfall's
+column and value-scatter DPFs. Fix one such root $R$.
+Write $\langle c,j\rangle$ for a fixed injective 128-bit encoding of a
+64-bit purpose label $c$ and a 64-bit counter $j$.
+The labels $\mathsf{node}$, $\mathsf{leaf}$, and $\mathsf{next}$ below are
+distinct. Internal counter position $j$ uses
+\[
+ k_j:=\mathsf{AES}_R\bigl(\langle\mathsf{node},\lfloor j/1024\rfloor\rangle\bigr).
+\]
+One parent producing two children consumes one position. Sparse traversal
+starts at zero and continues across trees and levels, including
+dense-to-sparse boundary expansions. Dense recomputation restores each
+node's position in public per-tree, per-level counter ranges. Thus revisiting
+a node preserves its key. Each chunk contains at most 1,024 distinct parent
+positions; neither counter assignment depends on the secret active path.
+
+\paragraph{Cached-leaf rekeying.}
+Each cached-leaf stream has a separate public root $R_0$. Number its leaves
+$j=0,1,\ldots$ in public row order, continuing across row boundaries.
+Expansion $q$ derives its keys and advances its root by
+\[
+ k_{q,j}:=\mathsf{AES}_{R_q}
+     \bigl(\langle\mathsf{leaf},\lfloor j/1024\rfloor\rangle\bigr),
+ \qquad
+ R_{q+1}:=\mathsf{AES}_{R_q}(\langle\mathsf{next},0\rangle).
+\]
+For a saved prefix $s\in\{0,1\}^{127}$, conversion applies
+$H_{k_{q,j}}(s\Vert0)$ before coefficient conversion and the party's sign.
+For $\mathbb G=\mathbb Z_{2^{64}}$, coefficient conversion takes the low
+64 bits. Other coefficient contexts use their specified conversion maps.
+The extra public context $j$ is part of this concrete evaluator; the
+figures use the abstract notation $\mathsf L_q$.
+The roots advance deterministically, so rekeying adds no DMPF messages or
+OTs and requires no fresh public coins during expansion. The implementation
+reuses each expanded AES key across a chunk and retains eight-node batching.
+
+Rekeying is intended to limit same-key collision effects. It does not
+establish the generator requirements or remove collisions within a chunk. A concrete
+proof must handle the public schedules jointly with setup openings, dense
+export, and all leaf conversions. Distinct purpose encodings do not by
+themselves prove independence across derived roots or expansion rounds.

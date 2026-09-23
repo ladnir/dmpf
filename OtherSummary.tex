@@ -2,8 +2,10 @@
 
 
 
-In addition to Reverse Cuckoo, we develop two complementary DMPF variants that are useful in
-specific parameter regimes.
+Beyond the core Waterfall construction, we develop two complementary generic
+DMPF variants for specific parameter regimes.  The Ring-LPN-specialized
+Reverse-Cuckoo optimization is presented separately in
+\sectionref{sec:revCuckoo}.
 
 \paragraph{Bucketing.}
 When indices are (approximately) uniform, we partition the domain into $k$ buckets and apply a
@@ -15,7 +17,7 @@ machinery and parameterization details are provided in the appendix. See \sectio
 
 \paragraph{Big-State.}
 We also cover the big-state paradigm and provide two fully distributed key-generation paths.
-The first is a black-box approach inspired by Reverse Cuckoo's assignment/solving viewpoint;
+The first is a black-box linear-algebraic assignment approach;
 the second evaluates the trusted-dealer-style big-state key generation inside generic MPC using
 an MPC-friendly PRG instantiation, trading custom distributed subprotocols for engineering
 simplicity. The complete protocols and tradeoffs are deferred to the appendix. See \sectionref{sec:bigState} for details.

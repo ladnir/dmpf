@@ -3,63 +3,92 @@
 \section{Distributed Multi-Point Function}\label{sec:dmpf}
 
 
-%### 3 Distributed Multi-Point Functions (DMPFs) — Overview and Roadmap
+\sectionref{sec:dpf} defined a reusable DPF whose setup fixes one index and
+whose expansions supply many payloads.  A distributed multi-point function
+(DMPF) provides the same interface for at most $t$ indices.  Running $t$
+independent DPFs realizes this interface, but costs $O(tN)$ local work.
 
-\sectionref{sec:dpf} established how a DPF lets two parties share a vector that is zero everywhere except at a \emph{single} secret location.  In many real-world privacy-preserving tasks, however -- think batched private look-ups, sparse PIR queries, or advanced PCG constructions -- \emph{several} positions must be populated at once.  A naïve implementation would simply run $t$ independent DPFs and add their outputs, but this inflates keys, computation, and communication by a factor of $t$.
+Let $\mathcal X_N:=[0,N)\cup\{N\}$, where $N$ is a dummy address.  For
+$A\in\mathcal X_N^t$ and $B\in\mathbb G^t$, define the map
+\[
+ \mathsf{mp}_{N,t}(A,B)(x):=
+ \sum_{i\in[0,t):A_i=x}B_i,
+ \qquad x\in[0,N).
+\]
+Rows with address $N$ make no contribution.  Equal real addresses contribute
+their payload sum.  \figureref{fig:dmpfFunc} defines the reusable ideal
+functionality targeted by the constructions below.
+Calls have inputs in their declared domains; no input-membership test is
+included in the protocol costs.
+As for the single-point functionality, the corrupt party $P_b$,
+$b\in\{0,1\}$, chooses its output share.
 
-In this section we show how to avoid that blow-up by moving to \emph{Distributed Multi-Point Functions} (DMPFs), which secret-share a vector of length $N$ containing up to $t$ non-zero entries while retaining the compactness and efficiency that make DPFs attractive.  \figureref{fig:dmpfFunc} formalises the ideal functionality we target: given secret-shared index-value pairs
-$(\share{A_1},\dots,\share{A_t})\in [0,N)^t$ and
-$(\share{B_1},\dots,$ $\share{B_t})\in \GG^t$, the parties obtain an additive sharing of the vector
-$\sum_{i=1}^{t}\unitVec(A_i,B_i)$.
-
-Achieving this compactly raises three core challenges:
-
-\begin{enumerate}
-    \item \emph{Computational overhead.} The work should scale with $N$ and be ideally be independent of $t$.
-    \item \emph{Succint key generation.} The communication overhead must be sublinear in $N$, ideally just $O(t\log N)$.
-    \item  \emph{Index collisions \& deduplication.}  Duplicate indices must be merged without leaking which entries collided. 
-\end{enumerate}
-
-A trivial and common way \cite{boyle2020efficient,foleage,anyField,pcgZ2k} to implement a DMPF is with $t$ instances of a DPF, one for each $(A_i,B_i)$ pair. The final result is obtained by adding the DPFs together. However, this approach results in $O(Nt)$ work and therefore is far from the theoretical optimal of just $O(N)$. Indeed, implementations have shown that this is the main bottleneck for important applications \cite{foleage,libOTe}.
-We address these challenges with the following constructions:
-
-\begin{itemize}
-  \item \emph{\sectionref{sec:cuckoo} Cuckoo-based baseline.}
-  We review the classical cuckoo-hash approach \cite{cuckooDmpf,dmpf}, which can be viewed as a concrete instantiation of earlier batch-code-based FSS ideas \cite{fssBatchCodes}: each point is routed to one of several buckets using pairwise-independent hash functions. We then further optimize it using our new sparse-DPF is instantiated per bucket.  While conceptually simple, the scheme suffers from heavy key-generation cost, making it ill-suited for tight concrete efficiency.
-
-   \item \emph{\sectionref{sec:revCuckoo} Reverse-Cuckoo DMPF.}
-  We flip the viewpoint: instead of first choosing hash function and then assigning the points into bins, we first randomly assign the input points into bins and then solve for a set of compatible hash functions within MPC. Interestingly, the proof of security of this construction consists of the simulator performing cuckoo hashing.
-
-   \item \emph{\sectionref{sec:bucketing} Bucketing DMPF.} The Bucketing DMPF construction optimizes key generation and evaluation by partitioning the $t$ input index-value pairs into multiple buckets, each handled independently—typically via a sparse DPF—enabling parallelism and reducing key size compared to running $t$ separate DPFs. By selecting bucket parameters and assignment algorithms carefully, this approach balances efficiency with security, ensuring duplicate indices are resolved correctly without leaking information.
-  
-
- \item \emph{\sectionref{sec:bigState} Big-State DMPF.}
-  We give two new key generation protocols for the  Boyle-Gilboa-Hamilis-Ishai-Tu \emph{big-state} paradigm\cite{dmpf}.  The first is blackbox and is inspired by our Reverse-Cuckoo construction. The other is a suprisingly simple idea to use generic MPC and the recent AltMod-based PRG to efficiently distribute the ``non-distributed'' key generation algorithm.
-\end{itemize}
-
-Throughout the section we give precise complexity tables, security proofs in the standard simulation model, and concrete parameter choices targeting 128-bit security.  The end result is a toolkit that lets protocol designers pick the DMPF flavour -- cuckoo, reverse-cuckoo, bucketing or big-state -- that  best matches their workload's size and latency constraints.
-
-With the roadmap in place, we now dive into the simplest construction.
-
-
-\begin{figure}\vspace{-0.3cm}\small
+\begin{figure}[H]\vspace{-0.3cm}\small
 	\centering
-	\fbox{ \begin{minipage}{.95\textwidth}
-    For public parameters $N \in \mathbb{N}, t \in [1, n]$ and group $\mathbb{G}$.\\
-    
-    On input $\share{A}\in [0, N)^t,\share{B}\in \mathbb{G}^t$, computes:
+	\fbox{ \begin{minipage}{.95\textwidth}\raggedright
+    Public parameters are $\kappa,N,t\in\mathbb N$ and a finite additive group
+    $\mathbb G$.  The functionality maintains state $(A,q)$, initially
+    undefined.\\
+    \medskip
+
+    $\mathcal F_{\mathsf{rDMPF}}.\mathsf{Setup}
+      (\share A\in\mathcal X_N^t)\longrightarrow\mathsf{ready}$:
     \begin{enumerate}
-        \item Let $y=\sum_{i\in [t]}\unitVec(A_i, B_i)$
-        \item Sample $\share{y}$.
-        \item Output $\share{y}$.
+        \item Reconstruct $A$ from the two submitted shares.
+        \item If setup was already called, output $\bot$.
+        \item Store $(A,q):=(A,0)$ and output $\mathsf{ready}$.
+    \end{enumerate}
+    \medskip
+
+    $\mathcal F_{\mathsf{rDMPF}}.\mathsf{Expand}
+      (\share B\in\mathbb G^t)
+      \longrightarrow\share y\in\mathbb G^{[0,N)}$:
+    \begin{enumerate}
+        \item If setup has not completed, output $\bot$.
+        \item Receive $y_b\in\mathbb G^{[0,N)}$ from the corrupt party $P_b$.
+        \item Reconstruct $B$ from the two submitted shares.
+        \item Output $y_{1-b}:=\mathsf{mp}_{N,t}(A,B)-y_b$ to $P_{1-b}$.
+        \item Set $q:=q+1$ and retain $A$.
     \end{enumerate}
     \end{minipage}}
 \caption{%
-  Distirbuted Multi-Point Function (DMPF) Functionality.\label{fig:dmpfFunc}
-}\vspace{-1cm}
+  Reusable distributed multi-point functionality.\label{fig:dmpfFunc}
+}
 \end{figure}
 
+We use the same static semi-honest simulation convention as for
+$\mathcal F_{\mathsf{rDPF}}$.  For either corrupt party $P_b$, the simulator
+receives only public parameters and that party's input shares.  It generates
+the corrupt view and submits $y_b$ to the functionality on each expansion.
+For every polynomial $Q(\kappa)$ and every static semi-honest PPT adversary,
+there must exist a stateful PPT simulator whose view, jointly with the
+honest outputs, is computationally indistinguishable from the real execution
+for at most $Q(\kappa)$ adaptively chosen payload vectors.
+The simulator proceeds online without rewinding or receiving future inputs.
+The view includes persistent local state, public values, messages, and
+output shares.
 
+An efficient realization must address three costs:
 
+\begin{enumerate}
+    \item \emph{Local expansion.} The dominant leaf work should be linear
+    in $N$, with a small factor independent of $t$.
+    \item \emph{Succinct key generation.} Communication should be sublinear
+    in $N$, ideally $O(t\log N)$.
+    \item \emph{Deduplication.} Payloads at duplicate indices must be aggregated
+    without revealing which indices coincide.
+\end{enumerate}
 
+The sum-of-DPFs baseline is common in PCGs
+\cite{boyle2020efficient,foleage,anyField,pcgZ2k}; its $tN$ leaf work can
+dominate correlation generation \cite{foleage,libOTe}.
+\sectionref{sec:cuckoo} reviews the sparse-column layout;
+\sectionref{sec:waterfallCuckoo} gives Waterfall's generic realization with
+$4N$ and $3N$ profiles. Bucketing and big-state methods offer other
+setup--state tradeoffs in \sectionref{sec:bucketing} and
+\sectionref{sec:bigState}.
 
+The later Reverse-Cuckoo specialization in \sectionref{sec:revCuckoo}
+does not realize the generic functionality above. It uses random Ring-LPN
+supports and an additional leakage-robust decisional assumption to obtain
+$2N$ expansion.

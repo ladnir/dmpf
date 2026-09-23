@@ -12,14 +12,11 @@
 \usepackage{tikz,forest}
 \usepackage{pgfplots}
 \pgfplotsset{compat=1.18}
-\usepackage[pdfauthor={},pdfpagelabels=true,linktocpage=true,hidelinks,linktoc=all,colorlinks]{hyperref}
-\usepackage[nameinlink,capitalize]{cleveref}
 \iffull 
 \else 
 \fi
     \usepackage{cite}
     \usepackage[square,comma,numbers,sort&compress]{natbib} 
-\hypersetup{linkcolor = {black}, citecolor = {magenta}, urlcolor = {black}}
 \usepackage{booktabs}
 
 
@@ -37,6 +34,10 @@
 
 \usepackage{multirow}
 \usepackage{algorithmicx, algorithm, algpseudocode}
+
+% Load hyperlink support after the float packages so their anchors are patched.
+\usepackage[pdfauthor={},pdfpagelabels=true,linktocpage=true,hidelinks,linktoc=all,colorlinks]{hyperref}
+\usepackage[nameinlink,capitalize]{cleveref}
 
 
 \newcommand{\protbox}[1]{\fbox{\small\hbox{\quad\begin{minipage}{\textwidth}\smallskip#1\end{minipage}\quad}}}
@@ -115,6 +116,7 @@
     \newtheorem{conjecture}{Conjecture}[section]
     \newtheorem{lemma}[theorem]{Lemma}
     \newtheorem{proposition}[theorem]{Proposition}
+    \newtheorem{assumption}[theorem]{Assumption}
     \newtheorem{definition}[theorem]{Definition}
     \newtheorem*{claim}{Claim}
     \newtheorem{remark}[theorem]{Remark}
@@ -366,7 +368,10 @@
 \newcommand{\SumDmpf}{\textsf{SumDmpf}\xspace}
 \newcommand{\RcDmpf}{\textsf{RcDmpf}\xspace}
 %% References%%%%%%%%%%%%%
+% Keep the object name and number inside the same link. The starred reference
+% supplies the number without creating a nested hyperlink.
 \newcommand{\namedref}[2]{\hyperref[#2]{#1~\ref*{#2}}\xspace}
+\newcommand{\namedeqref}[2]{\hyperref[#2]{#1~(\ref*{#2})}\xspace}
 \newcommand{\claimref}[1]{\namedref{Claim}{clm:#1}}
 \newcommand{\subclaimref}[1]{\namedref{Sub-Claim}{subclm:#1}}
 \newcommand{\lemmaref}[1]{\namedref{Lemma}{lem:#1}}
@@ -377,7 +382,7 @@
 
 \newcommand{\corolref}[1]{\namedref{Corollary}{#1}}
 \newcommand{\figureref}[1]{\namedref{Figure}{#1}}
-\newcommand{\equationref}[1]{\namedref{Equation}{#1}}
+\newcommand{\equationref}[1]{\namedeqref{Equation}{#1}}
 \newcommand{\defref}[1]{\namedref{Definition}{#1}}
 \newcommand{\observationref}[1]{\namedref{Observation}{#1}}
 \newcommand{\procedureref}[1]{\namedref{Procedure}{#1}}

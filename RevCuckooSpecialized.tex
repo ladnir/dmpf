@@ -1,0 +1,638 @@
+\section{Reverse Cuckoo for Ring-LPN}
+\label{sec:revCuckoo}
+
+Waterfall Cuckoo is our generic DMPF construction.  This section gives a
+smaller, application-specific alternative for the random sparse supports in
+our Ring-LPN PCG.  Reverse Cuckoo reduces the dominant local expansion from
+$3N$ or $4N$ to $2N$: instead of sampling hashes and then finding a placement,
+it samples a hidden placement and programs public hashes around it.  The price
+is support leakage. We first describe the $K=1$ construction, then derive
+its output distribution in the ideal hash model. The concrete evaluator
+requires a separate correctness analysis and leakage assumption.
+
+Here $K$ counts independently generated placement-first proposals passed to an
+optional public debiasing rule; $K=1$ simply publishes the sole proposal.  We
+lead with $K=1$ because it needs no proposal generation or comparison beyond
+the single published descriptor tuple. Larger $K$ adds setup work to reduce
+the idealized leakage, but does not reduce the $2N$ expansion cost.
+The attack analysis therefore starts with the unmitigated $K=1$ channel.
+
+\subsection{Concrete feature evaluator}\label{sec:hash}
+
+Reverse Cuckoo must program a public hash after the input rows have been
+shuffled.  We use a degree-two feature evaluator whose only nonlinear layer is
+one batch of bit multiplications.  Let
+$n:=\lceil\log_2(N+1)\rceil$, let
+$\mathsf{bin}_N:[0,N]\rightarrow\F_2^n$ be the canonical encoding, and write
+$\nu:=\mathsf{bin}_N(N)$.  A seed expands to independent uniform matrices
+\[
+ A_0,A_1\in\F_2^{n\times q'},
+ \qquad
+ A_2\in\F_2^{(n+q')\times q}.
+\]
+For $x\in[0,N]$, define
+\[
+ a(x):=\mathsf{bin}_N(x)A_0,
+ \qquad
+ b(x):=\mathsf{bin}_N(x)A_1,
+ \qquad
+ c(x):=a(x)\odot b(x),
+\]
+where $\odot$ is coordinate-wise multiplication in $\F_2^{q'}$.  The
+anchored feature vector and evaluator are
+\begin{equation}\label{eq:rc-concrete-feature}
+ \Phi(x):=\bigl(\mathsf{bin}_N(x)\oplus\nu,\,
+                  c(x)\oplus c(N)\bigr),
+ \qquad
+ F(x):=\Phi(x)A_2.
+\end{equation}
+Thus $F(N)=0$.  Each partition uses an independent seed, sampled jointly
+after the shuffled rows are fixed.  Under the ideal-cipher model for the
+seed expander, the three matrices are uniform.
+
+The two matrix products defining $a$ and $b$, the anchoring, and the final
+compression are linear over $\F_2$.  Evaluating one row therefore requires
+only the $q'$ secure bit products in $a(x)\odot b(x)$.  The implementation
+sets
+\begin{equation}\label{eq:rc-hash-widths}
+ q'=q=d+\lambda+8,
+\end{equation}
+up to byte alignment.  The fixed eight-bit margin is part of this evaluator;
+it does not change the independently chosen statistical parameter $\lambda$.
+The exact reason for the margin is given after the protocol.
+
+\subsection{The \texorpdfstring{$K=1$}{K=1} construction}
+
+Fix a domain $[0,N)$, a maximum support size $t$, two partitions of size $d$,
+and $m:=2d$.  We take $d$ to be a power of two and write
+$\ell:=\log_2d$.  Setup receives
+$\share A\in\mathcal X_N^t$, and each expansion receives
+$\share B\in\mathbb G^t$.  As elsewhere, the public symbol
+$N\notin[0,N)$ denotes a dummy address and has payload zero.
+
+For each partition $s\in[0,2)$, instantiate \equationref{eq:rc-concrete-feature}
+with an independent seed, and denote the resulting evaluator by
+$F_s:[0,N]\rightarrow\F_2^q$.  Let
+$\mathsf{enc}_d:[0,d)\rightarrow\F_2^\ell$ be binary encoding and let
+$\mathsf{dec}_d$ denote its inverse.  A public descriptor
+$R_s\in\F_2^{q\times\ell}$ defines the hash
+\begin{equation}\label{eq:rc-programmed-hash}
+ h_s(x):=\mathsf{dec}_d\bigl(F_s(x)R_s\bigr)\in[0,d).
+\end{equation}
+
+\paragraph{Place first.}
+Setup deduplicates the addresses, appends $m-t$ copies of $N$, and applies a
+uniform secret shuffle.  Write $\bar A_r$ for row $r\in[0,m)$ after the shuffle.
+The protocol retains the shuffle and applies it to each later deduplicated
+payload vector.  Write $B'_r$ for the corresponding shuffled payload.  Row
+$r=sd+b$, for $s\in[0,2)$ and $b\in[0,d)$, is interpreted as the physical bin
+$(s,b)$.  Since the dummy rows are indistinguishable and the shuffle is
+uniform, the real rows occupy a uniform injection into the $m$ bins.
+
+\paragraph{Program one partition at a time.}
+For partition $s$, form the secret matrix and public target
+\[
+ M_s:=
+ \begin{bmatrix}
+  F_s(\bar A_{sd})\\[-1mm]
+  \vdots\\[-1mm]
+  F_s(\bar A_{sd+d-1})
+ \end{bmatrix}
+ \in\F_2^{d\times q},
+ \qquad
+ Y_d:=
+ \begin{bmatrix}
+  \mathsf{enc}_d(0)\\[-1mm]
+  \vdots\\[-1mm]
+  \mathsf{enc}_d(d-1)
+ \end{bmatrix}
+ \in\F_2^{d\times\ell}.
+\]
+Invoke $\ell$ parallel instances of \textsf{bin-solver} to sample
+$\share R_s$ satisfying the independent rows of
+\begin{equation}\label{eq:rc-programming-system}
+ M_sR_s=Y_d.
+\end{equation}
+The solver natively skips a row that reduces to zero, regardless of its
+right-hand side.  Hence a dummy row, for which $F_s(N)=0$, imposes no
+constraint.  Reveal $R_0,R_1$ after both systems have been solved.
+
+If a real record $x=\bar A_{sd+b}$ occupies row $sd+b$, then its equation is
+$F_s(x)R_s=\mathsf{enc}_d(b)$ and therefore $h_s(x)=b$.  Thus its shuffled row is a
+valid cuckoo position under the revealed hashes.
+
+\paragraph{Build the sparse columns.}
+The public position map $P\in\{0,1\}^{[0,N)\times m}$ is
+\begin{equation}\label{eq:rc-position-map}
+ P_{x,sd+h_s(x)}=1
+ \quad\text{for every }x\in[0,N),\ s\in[0,2),
+\end{equation}
+with all other entries zero.  Column $j\in[0,m)$ has sparse domain
+$S_j:=\{x\in[0,N):P_{x,j}=1\}$.  Setup replaces each dummy in column $j$ by a
+public representative of $S_j$ and initializes one reusable sparse DPF over
+$S_j$.  The corresponding payload is always zero.  Expanding all columns and
+adding them at their original addresses yields
+$\sum_{i\in[0,t)}\unitVec_{[0,N)}(A_i,B_i)$.
+
+The complete construction is summarized below.  Every invoked operation is
+defined earlier: \textsf{eq}, a standard reusable oblivious shuffle,
+\textsf{bin-solver}, and the reusable sparse DPF.
+
+\begin{figure}[H]\footnotesize
+\centering
+\fbox{\begin{minipage}{.95\textwidth}
+ For public parameters $\kappa,N,t,d,q,q'\in\mathbb N$ and a finite additive
+ group $\mathbb G$, let $m:=2d$.\\
+ Party $p\in\{0,1\}$ stores its local component of
+ $\mathsf{st}_{\mathsf{RC}}=(\share\delta,\share e,R,P,S)$, initially
+ undefined.  The instance owns a named reusable oblivious shuffle
+ $\mathsf{Shuf}$ on $m$ rows and named reusable DPF instances
+ $\mathsf{DPF}^{j}$ over $S_j$ whenever $S_j\neq\emptyset$.
+ \par\medskip
+
+ \noindent
+ $\mathsf{ReverseCuckoo}_1.\mathsf{Setup}
+ (\share A\in\mathcal X_N^t)
+ \longrightarrow\mathsf{ready}$.
+ \par\smallskip
+ Party $p\in\{0,1\}$ computes:
+\begin{enumerate}[nosep]
+ \item If setup has already completed, return $\bot$.
+ \item For $i\in[0,t)$, set $\share e_{i,i}:=1$.  For $i<j$, set
+       $\share e_{i,j}:=\textsf{eq}(\share A_i,\share A_j)$ and
+       $\share e_{j,i}:=\share e_{i,j}$.
+ \item For $i\in[0,t)$, set
+       $\share\delta_i:=(1-\textsf{eq}(\share A_i,N))
+       \bigwedge_{j<i}(1-\share e_{i,j})$ and
+       $\share A_i^*:=N\oplus\share\delta_i(N\oplus\share A_i)$.
+ \item Append $m-t$ copies of $(N,0)$ to $(\share A^*,\share\delta)$ and set
+       $(\share{\bar A},\share\chi):=
+       \mathsf{Shuf}.\mathsf{Setup}(\share A^*\Vert N^{m-t},
+                           \share\delta\Vert0^{m-t})$.
+ \item Jointly sample and reveal independent evaluator seeds for $s\in[0,2)$,
+       and instantiate $F_s$ by \equationref{eq:rc-concrete-feature}.
+ \item For $s\in[0,2)$, form
+       $\share M_s[b,*]:=F_s(\share{\bar A}_{sd+b})$ for every $b\in[0,d)$.
+ \item For $s\in[0,2)$, compute
+       $\share R_s\gets\textsf{bin-solver}(\share M_s,Y_d)$.
+ \item Reveal $R_0,R_1$ and define $h_s$ by
+       \equationref{eq:rc-programmed-hash}.
+ \item Define $P$ by \equationref{eq:rc-position-map} and
+       $S_j:=\{x\in[0,N):P_{x,j}=1\}$ for every $j\in[0,m)$.
+ \item For $j\in[0,m)$, set $D_j:=\min S_j$ if $S_j\neq\emptyset$ and
+       $D_j:=0$ otherwise, and set
+       $\share A'_j:=D_j\oplus
+       \share\chi_j(D_j\oplus\share{\bar A}_j)$.
+ \item For $j\in[0,m)$ with $S_j\neq\emptyset$, invoke
+       $\mathsf{DPF}^{j}.\mathsf{Setup}_{S_j}(\share A'_j)$.
+ \item Store $\mathsf{st}_{\mathsf{RC}}:=(\share\delta,\share e,R,P,S)$ and
+       return $\mathsf{ready}$.
+\end{enumerate}
+
+ \par\medskip
+ \noindent
+ $\mathsf{ReverseCuckoo}_1.\mathsf{Expand}
+ (\share B\in\mathbb G^t)
+ \longrightarrow\share y\in\mathbb G^{[0,N)}$.
+ \par\smallskip
+ Party $p\in\{0,1\}$ computes:
+ \begin{enumerate}[nosep]
+  \item If setup has not completed, return $\bot$.  Otherwise, read
+        $\mathsf{st}_{\mathsf{RC}}$.
+  \item For $i\in[0,t)$, set
+        $\share B_i^*:=\share\delta_i
+        \sum_{j\in[0,t)}\share e_{i,j}\share B_j$.
+  \item Set $\share B':=
+        \mathsf{Shuf}.\mathsf{Expand}(\share B^*\Vert0^{m-t})$.
+  \item For $j\in[0,m)$ with $S_j\neq\emptyset$, set
+        $\share y^{(j)}:=
+        \mathsf{DPF}^{j}.\mathsf{Expand}_{S_j}(\share B'_j)$.
+  \item For $x\in[0,N)$, set
+        $\share y(x):=\sum_{j:x\in S_j}\share y^{(j)}(x)$.
+  \item Return $\share y\in\mathbb G^{[0,N)}$.
+ \end{enumerate}
+\end{minipage}}
+\caption{Reusable $K=1$ Reverse-Cuckoo specialization.  Setup fixes the
+addresses, programmed hashes, shuffle, and DPF leaf seeds.  Expansion supplies
+only a new payload vector.}
+\label{fig:reverse-cuckoo-k1}
+\end{figure}
+
+\subsection{Correctness of the programmed systems}
+\label{sec:revCuckooHashCorrectness}
+
+Fresh matrices do not make the evaluator rows independent.  Its degree-two
+structure instead permits an exact relation-by-relation analysis.  Fix the
+real points $x_1,\ldots,x_r$ assigned to one partition.  Stack their evaluator
+outputs and public row labels in
+\[
+ H_A:=\begin{bmatrix}F(x_1)\\[-1mm]\vdots\\[-1mm]F(x_r)\end{bmatrix}
+ \in\F_2^{r\times q},
+ \qquad
+ Y\in\F_2^{r\times\ell}.
+\]
+A nonzero $\alpha\in\F_2^r$ is harmful if
+$\alpha^\top H_A=0$ but $\alpha^\top Y\neq0$.
+
+\begin{lemma}[Survival of a fixed relation]\label{lem:rc-relation-survival}
+Write $\bar x_i:=\mathsf{bin}_N(x_i)$ and define
+\[
+ L_\alpha:=\bigoplus_i\alpha_i(\bar x_i\oplus\nu),
+ \qquad
+ Q_\alpha:=\bigoplus_i\alpha_i\bar x_i^\top\bar x_i
+       \oplus\left(\bigoplus_i\alpha_i\right)\nu^\top\nu.
+\]
+If $L_\alpha\neq0$, then the output relation survives with probability
+$2^{-q}$.  If $L_\alpha=0$, then $Q_\alpha$ is alternating and has even rank
+$\rho$.  In this case the survival probability is exactly
+\begin{equation}\label{eq:rc-relation-survival}
+ \left(\frac12+2^{-\rho-1}\right)^{q'}
+ +\left(1-\left(\frac12+2^{-\rho-1}\right)^{q'}\right)2^{-q}.
+\end{equation}
+\end{lemma}
+\begin{proof}
+The diagonal of $Q_\alpha$ is $L_\alpha$.  When $L_\alpha=0$, one product
+coordinate of the $\alpha$-sum equals $u^\top Q_\alpha v$ for independent
+uniform $u,v$ and is zero with probability
+$1/2+2^{-\rho-1}$.  All $q'$ product coordinates vanish with the first term
+of \equationref{eq:rc-relation-survival}.  Otherwise the lifted relation is
+nonzero, and uniform $A_2$ maps it to zero with probability $2^{-q}$.  If
+$L_\alpha\neq0$, the lifted relation is always nonzero, giving $2^{-q}$.
+\end{proof}
+
+For example, the four vertices of an affine plane have $\rho=2$, so their
+relation survives the nonlinear lift with probability $(5/8)^{q'}$.  The
+eight vertices of an affine three-cube have $\rho=0$, and their degree-two
+relation survives every seed.  These facts rule out the usual argument that
+the rows may simply be treated as independent uniform strings.  They do not,
+however, determine the caller-level failure probability: all related points
+must first occur in the Ring-LPN batch, enter one partition, and receive
+labels with nonzero XOR.
+
+We also account for a local support filter: each party resamples its four
+regular supports until their total number of occupied residues modulo 128
+is at least 61.  Residues are counted separately in each polynomial, before
+coefficient cancellation.  The parties filter independently, before sampling
+the shuffle and evaluator seeds.
+
+\begin{proposition}[Ring-LPN batch correctness]\label{prop:rc-ringlpn-correctness}
+Assume a uniform oblivious shuffle, uniform Ring-LPN block offsets, and ideal
+uniform matrices $A_0,A_1,A_2$.  For the implementation-shaped batch with
+$N_{\mathsf R}=2^{20}$, $P=4$, $t=16$, $w=2$, $d=16$, and $q'=q=64$, the
+probability that any programmed system is inconsistent is less than
+$2.379\cdot10^{-13}<2^{-41.934}$.  If both parties instead apply the local
+support filter above, this probability is less than
+$4.739\cdot10^{-13}<2^{-40.940}$.
+\end{proposition}
+The bound counts every possible zero-linear-moment relation by weight and
+quadratic rank, then adds the ordinary rank loss in the final compression.
+\appendixref{app:revCuckooHash} gives the counting argument.  Filtering changes
+each polynomial-pair contribution by at most a factor of $2.044$; the
+final-compression bound remains unchanged.  At the former
+widths $q'=q=56$, the corresponding bound was only $2^{-37.694}$.  The fixed
+eight-bit margin in \equationref{eq:rc-hash-widths} therefore restores more
+than 40 bits of batch correctness without repurposing $\lambda$.  The
+protocol needs no explicit abort: a skipped inconsistent equation is included
+in this correctness error.  This proposition is specific to the Ring-LPN
+caller; the AnyField distribution requires a separate analysis.
+
+The dependence on $N_{\mathsf R}$ is material.  At the same evaluator widths,
+our present proof gives only $34.213$ bits for $N_{\mathsf R}=2^{18}$ and
+$26.218$ bits for $N_{\mathsf R}=2^{16}$.  Deterministic affine-cube relations
+dominate both bounds, so increasing $q$ or $q'$ alone cannot improve them.
+Accordingly, only the $N_{\mathsf R}=2^{20}$ Ring-LPN row carries the stated
+40-bit correctness claim.  The smaller rows in the evaluation are performance
+scaling measurements.
+
+\paragraph{Cost.}
+Every address appears once in each of the two partition maps, so
+$\sum_j|S_j|=2N$.  After setup, local sparse-DPF expansion is therefore $2N$
+leaf operations, independent of $t$.  Setup performs one shuffle, two
+$d\times q$ binary solves with $\ell$ right-hand-side bits, sparse-set
+construction, and sparse-DPF generation.  These are exactly the stages
+measured in \sectionref{sec:RevCuckooPerf}.
+
+\subsection{What the descriptor reveals}
+\label{sec:revCuckooDistribution}
+
+The placement is hidden, but the public hashes are not distributed like
+independent hashes.  The difference has a simple exact description.
+
+Fix a set $A\subseteq[0,N)$ of $t$ distinct addresses.  In the ideal hash
+model, let $U$ sample $w$ independent uniform functions
+$h_s:[0,N)\rightarrow[0,d)$; the construction above uses $w=2$.  For a sampled
+hash tuple $h$, define
+\begin{equation}\label{eq:rc-placement-count}
+ Z_A(h):=
+ \left|\left\{
+  \tau:A\hookrightarrow[0,w)\times[0,d) :\
+  \tau(x)=(s,b)\Longrightarrow h_s(x)=b
+ \right\}\right|.
+\end{equation}
+Thus $Z_A(h)$ is the number of injective cuckoo placements of $A$ supported by
+$h$.  There are $(wd)_t$ injections, and any fixed injection agrees with a
+uniform $h$ with probability $d^{-t}$, so
+\begin{equation}\label{eq:rc-expected-placements}
+ \mathbb E_{h\gets U}[Z_A(h)]=\frac{(wd)_t}{d^t}.
+\end{equation}
+
+The $K=1$ Reverse-Cuckoo experiment chooses a uniform injection $\tau$ first
+and then samples a uniform hash tuple consistent with $\tau$.  Summing over
+all hidden injections compatible with a fixed output $h$ gives
+\begin{equation}\label{eq:rc-size-bias-clean}
+ \Pr[H=h\mid A]_{\mathsf{RC}_1}
+ =\Pr[H=h]_U\,
+   \frac{Z_A(h)}{\mathbb E_U[Z_A(H)]}.
+\end{equation}
+This is the complete leakage channel in the ideal model: Reverse Cuckoo
+\emph{size-biases} the ordinary hash distribution by its number of valid
+placements.
+
+\equationref{eq:rc-size-bias-clean} also isolates a tempting but incorrect
+simulation argument.  Sampling $U$ conditioned on $Z_A(H)>0$ gives equal
+weight to every feasible hash tuple.  Reverse Cuckoo instead gives a feasible
+tuple weight proportional to $Z_A(h)$.  Hidden placement randomness is already
+summed into $Z_A(h)$; it does not remove the multiplicity bias.
+
+\paragraph{The role of dummies.}
+The $m-t$ dummies make the real placement a uniform injection into all $m$
+bins and provide slack.  They impose no hash equation because $F_s(N)=0$ and
+no output because their payload is zero.  Increasing the slack smooths the
+placement-count distribution, but it does not change
+\equationref{eq:rc-size-bias-clean}: the descriptor is still weighted by
+$Z_A(h)$.
+
+\paragraph{Graph intuition for two partitions.}
+For $w=2$, represent each address $x\in A$ by an edge from
+$h_0(x)$ in the left partition to $h_1(x)$ in the right partition.  A valid
+placement orients every edge toward a distinct endpoint.  A tree component
+with $e$ edges contributes $e+1$ placements, a unicyclic component contributes
+two, and an overfull component contributes zero.  The global value $Z_A(h)$
+is the product of these component contributions.  Pair collisions are useful
+because they change the component structure and generally reduce $Z_A(h)$,
+but the exact channel is a higher-order matching statistic, not a collection
+of independently leaked support bits.
+
+\paragraph{Why this is not a generic DMPF.}
+For arbitrary chosen inputs, \equationref{eq:rc-size-bias-clean} depends on
+$A$.  A party can test public collisions among candidate addresses and
+distinguish supports.  Consequently Reverse Cuckoo does not realize the
+ordinary DMPF functionality for arbitrary inputs in the standard simulation
+model.  It realizes a leakage-augmented functionality that reveals one sample
+from the channel in \equationref{eq:rc-size-bias-clean}.  Waterfall Cuckoo
+exists precisely to avoid this qualification.
+
+The binary feature evaluator adds algebraic structure beyond the ideal
+random-function model.  \namedref{Proposition}{prop:rc-ringlpn-correctness} bounds
+the resulting consistency error for the Ring-LPN caller, but it does not turn
+the published descriptors into ideal independent hashes.  Our security
+assumption below therefore includes the descriptors produced by the concrete
+evaluator.  \equationref{eq:rc-size-bias-clean} remains the clean idealized
+leakage model used by the attack study.
+
+\subsection{Why sparse Ring-LPN may tolerate the leakage}
+
+In the PCG, $A$ is not an adversarial DMPF input.  It has the form in
+\equationref{eq:ringlpn-product-list}.  Each party holds $P=4$ regular
+support lists, and every list has one offset in each of $t=16$ blocks.  At the
+claimed $N_{\mathsf R}=2^{20}$ point, each block has length
+$L=N_{\mathsf R}/t=2^{16}$.  Against a semi-honest corrupt party, that party's
+four lists are known and the honest party's $Pt=64$ offsets remain hidden.
+Before the public Ring-LPN samples are used, those unknown offsets range over
+a space of size $L^{Pt}=2^{1024}$.
+
+Conditioning on a public Reverse-Cuckoo descriptor changes the support prior
+by
+\begin{equation}\label{eq:rc-posterior-reweighting}
+ \Pr[A\mid H=h]\ \propto\
+ \Pr_{\mathsf{reg}}[A]\,Z_A(h).
+\end{equation}
+It does not add candidate supports, turn the error dense, or reveal a linear
+equation in its positions.  It reweights an already sparse family by a
+nonlinear matching count.  Three features make this plausibly benign for LPN:
+
+\begin{enumerate}
+ \item \emph{Sparsity is preserved.}  Every posterior candidate still has one
+       position in each regular block.  The decoder's basic combinatorial
+       obstacle remains finding a tiny support inside a huge ambient ring.
+ \item \emph{The leakage is geometric, not linear.}  It describes collisions,
+       Hall obstructions, and placement multiplicity among hash images.  A
+       linear test of the Ring-LPN syndrome cannot directly consume the
+       statement ``this support graph has more matchings.''
+ \item \emph{The coefficients remain hidden.}  Reverse Cuckoo depends on
+       positions, not on the independent nonzero error coefficients.  Even a
+       correct partial support hypothesis must still satisfy the large-field
+       Ring-LPN equations.
+\end{enumerate}
+
+This is intuition, not a reduction.  Sparse decoding is often robust to
+partial support information, and stationary syndrome decoding provides a
+particularly strong analogy for the failure of linear tests, but neither fact
+proves that the matching weights are harmless.  A nonlinear decoder may bias
+its search toward high-likelihood supports.  The relevant question is
+therefore concrete: does the leakage appreciably reduce the best known
+Ring-LPN decoding exponent?
+
+In the stationary setting, the descriptor and support are reused while only
+the coefficients change.  Repeated expansions do not reveal fresh independent
+placement samples, but an attacker may amortize arbitrary preprocessing of the
+single descriptor.  Our assumption permits that preprocessing.
+
+\subsection{Concrete attack evidence for \texorpdfstring{$K=1$}{K=1}}
+\label{sec:revCuckooAttacks}
+
+We evaluated the channel primarily at the reduced point
+$(P,t,L)=(4,16,4096)$, for which $N_{\mathsf R}=tL=2^{16}$.  This point retains
+the implemented batching and Reverse-Cuckoo parameters while making the
+leakage-aware experiments tractable.  It is not the full
+$N_{\mathsf R}=2^{20}$ correctness point above.  Analytic calculations that
+scale to larger rings are identified separately.  All bit counts below are
+attack work exponents, and every leakage-aware algorithm is free to ignore the
+descriptor.  The experiments use the stronger $K=1$ channel throughout.
+
+\tableref{tab:revCuckooAttackCoverage} separates the attack families we
+considered from diagnostics that only describe the channel.  A negative entry
+means that the particular attack did not improve the best known exponent; it
+does not constitute a generic lower bound.
+
+\begin{table}[t]
+\centering
+\footnotesize
+\begin{tabular}{p{.29\textwidth}|p{.62\textwidth}}
+\toprule
+Attack or diagnostic & $K=1$ conclusion \\
+\midrule
+Linear tests, Fourier tests, and BKW
+& Fresh error coefficients cannot be cancelled directly.  Leakage can only
+  guide a dual word away from the posterior support; this is exactly a
+  conditional dual-avoidance problem.  The SSD theorem supplies the
+  no-leakage analogy, but does not cover adaptive leakage-guided selection. \\
+
+Stationary output-span and module tests
+& Reusing one descriptor does not create fresh placement leakage, but permits
+  arbitrary preprocessing.  Cross-expansion attacks remain outside the fixed
+  linear-test argument; fresh independent ring masks are security-critical. \\
+
+Likelihood-ordered support search and quadratic solving
+& Exact toy searches confirm that the channel is exploitable.  A direct
+  degree-two encoding at the production point has roughly $4N$ support
+  variables, $131{,}072$ placement variables, and about $10^{13}$ quadratic
+  support monomials.  This defeats naive dense XL, not structured solving. \\
+
+Regular Prange and posterior-guided ISD
+& Pairwise, sequential collision-conditioned, and complete-matching selectors
+  were tested.  The best repeatable production estimate is $2^{127.123}$
+  rather than $2^{128}$; complete-posterior sampling found no further gain,
+  with a particle-degeneracy caveat. \\
+
+Equation-coupled lists and blockwise beam search
+& Exact matching gives a clear advantage on reduced instances, including when
+  coupled to syndrome equations.  Full enumeration costs $2^{192}$ per
+  polynomial at production parameters, while the bounded beam remains
+  prohibitive for $L=4096$; neither yields a production attack. \\
+
+Syndrome projections and Wagner-style merging
+& The tested projected-bucket attack loses to the finer flat merge.  Guessing
+  intermediate projection shares repays the filtering gain in repetitions;
+  more elaborate representation reuse remains unexcluded. \\
+
+Regular Stern, MMT, and BJMM
+& Stern costs $2^{146.526}$; even an optimistic MMT estimate is at least
+  $2^{145.55}$ after granting the measured leakage gain.  The representation
+  attacks remain dominated. \\
+
+Sparse-factor statistical decoding
+& The best projected leakage weight is zero, and complete matching propagation
+  gives no measured gain.  The ordinary conservative estimate at mean folded
+  weight is $2^{128.450}$; low-weight-tail rejection is nevertheless required. \\
+
+Concrete feature and structured-rank audits
+& Reduced experiments detect neither stable leakage beyond ideal placement
+  multiplicity nor a rank advantage for guided information sets.  These are
+  diagnostics, not a pseudorandomness or production-rank proof. \\
+\bottomrule
+\end{tabular}
+\caption{Coverage of the Reverse-Cuckoo attack study.  All numerical claims
+use the stronger $K=1$ channel.}
+\label{tab:revCuckooAttackCoverage}
+\end{table}
+
+Exact small-instance experiments do find multi-bit improvements from the
+leakage.  This is important: the channel is exploitable, and its effect cannot
+be dismissed merely because it is nonlinear.  At production parameters,
+however, none of the implemented attacks improves upon the roughly one-bit
+gain of leakage-guided regular Prange.  The quadratic formulation and the
+stationary cross-expansion analysis identify additional attack surfaces, but
+we do not claim to have closed them.
+
+The most important structured attack reduces the ring modulo
+$X^{128}+a$.  The expected total folded support weight is $60.383$.  The
+published conservative statistical-decoding model gives $128.450$ bits at
+that mean.  Low folded weights are materially weaker: averaging the same
+optimistic model over unconditioned noise gives $122.482$ bits.  We therefore
+require the local support filter defined before
+\namedref{Proposition}{prop:rc-ringlpn-correctness}.  It accepts each party's sample with
+probability $0.501914$ and raises the averaged conservative estimate to
+$130.572$ bits.  The current prototype has a code-level TODO for this filter;
+the rejection is a security requirement, not a Reverse-Cuckoo mitigation.
+\appendixref{app:rc-hash-conditioning} accounts for its effect on programmed-hash
+correctness without assuming that the accepted offsets remain independent.
+
+For leakage adaptation after factor reduction, a degree-128 dual word can be
+chosen to vanish on any desired set of 127 out of 512 reduced coordinates.
+We projected the complete pair posterior into these coordinates and optimized
+the resulting global zero-set distribution.  Uniform selection is best for
+both expected work and average signal.  A final matching-aware experiment
+propagated complete support particles through the reduction; it also found no
+gain, but suffered low particle diversity.  Thus the obvious factor attack
+does not benefit from the leakage, while a fundamentally better joint
+matching-aware decoder remains unexcluded.
+
+The study therefore covers every attack family listed in
+\tableref{tab:revCuckooAttackCoverage}, but with different levels of evidence:
+some are production cost estimates, some are reduced experiments, and some are
+structural formulations or open audits.  It does not prove security against
+every decoder, a new structured solver for the quadratic system, a stronger
+cross-expansion module attack, or a new algebraic attack on the concrete
+feature evaluator.  The scripts, deterministic checks, raw CSVs, and fuller
+methodology are recorded in
+\path{experiments/rev_cuckoo_lpn_attack_study.md}.
+
+\subsection{Security statement and scope}
+
+The PCG needs a distinguishing assumption, not merely hardness of recovering
+a sparse support. We state it for the joint sequence of samples and the
+concrete published descriptors.
+
+Fix a polynomial count $P\geq2$, block count $t\mid N_{\mathsf R}$,
+and a field $\mathbb F_q$. Define
+\[
+ \mathbb R:=\mathbb F_q[X]/(X^{N_{\mathsf R}}+1).
+\]
+Fix a corrupted party $p\in\{0,1\}$, a number of expansions $Q$, and
+a total adversarial work budget $T$. The experiment
+$\mathsf{RC\text{-}LPN}_b$ has challenge bit $b\in\{0,1\}$.
+
+\begin{enumerate}
+ \item Independently sample the parties' regular supports, applying the
+ local support filter stated before
+ \namedref{Proposition}{prop:rc-ringlpn-correctness}.
+ Retain these supports for all $Q$ expansions.
+ \item Run the concrete $K=1$ descriptor-generation procedure on every
+ product list in \equationref{eq:ringlpn-product-list}, with fresh
+ shuffle and evaluator randomness. Let $\mathsf H$ contain all public
+ evaluator seeds and programmed descriptors.
+ Give $\mathsf H$ and party $p$'s supports to the adversary.
+ \item For each expansion $u\in[0,Q)$, sample independent nonzero
+ coefficients on both parties' supports. Write $e^{(u)}_{v,a}$ for
+ party $v$'s polynomial $a\in[0,P)$. Give party $p$'s coefficients
+ to the adversary.
+ \item For each expansion $u$, put $r_0^{(u)}:=1$ and sample
+ $r_i^{(u)}\gets\mathbb R$ independently for $i\in[1,P)$.
+ Write $\mathbf r^{(u)}:=(r_i^{(u)})_{i\in[0,P)}$.
+ If $b=0$, set
+ \[
+ Z^{(u)}:=\sum_{i\in[0,P)}r_i^{(u)}e^{(u)}_{1-p,i}.
+ \]
+ If $b=1$, sample $Z^{(u)}\gets\mathbb R$ independently.
+ Give the adversary every pair $(\mathbf r^{(u)},Z^{(u)})$.
+ \item The adversary outputs a bit. Its work, including preprocessing of
+ $\mathsf H$ before receiving the samples, is at most $T$.
+\end{enumerate}
+
+The supports, filter, descriptors, and corrupted-party information have the
+same distribution in both experiments. Only the honest party's noisy ring
+samples are replaced; in the random experiment, those replacements are
+independent of the hidden supports and descriptors.
+
+\begin{assumption}[Leakage-robust decisional Ring-LPN]
+\label{ass:rc-decisional-lpn}
+For the chosen parameter family and polynomially bounded $T,Q$, the advantage
+\[
+ \epsilon_{\mathsf{RC}}(T,Q):=
+ \sup_{\mathcal A:\operatorname{time}(\mathcal A)\leq T}
+ \left|\Pr[\mathcal A(\mathsf{RC\text{-}LPN}_0)=1]
+       -\Pr[\mathcal A(\mathsf{RC\text{-}LPN}_1)=1]\right|
+\]
+is negligible in the computational security parameter.
+The concrete point studied here has
+\[
+ (N_{\mathsf R},P,t,d,q',q_{\mathsf{hash}})
+ =(2^{20},4,16,16,64,64),
+\]
+with the Goldilocks coefficient field $q=2^{64}-2^{32}+1$.
+Here $q_{\mathsf{hash}}$ denotes
+the feature-compression width called $q$ earlier in this section.
+\end{assumption}
+
+At fixed concrete parameters, $\epsilon_{\mathsf{RC}}(T,Q)$ is a conjectured
+advantage bound, not a consequence of the attack work estimates.
+Support-recovery experiments provide evidence about some attacks on this
+assumption; they do not establish decisional security.
+
+This is the additional pseudorandomness assumption needed to expose the
+Reverse-Cuckoo descriptors in the Ring-LPN application.
+A full PCG security proof must also compose the distributed generation
+subprotocols and reusable DPF realization with the target correlation
+functionality. The separate hash-correctness bound applies to the filtered
+caller distribution.

@@ -7,12 +7,14 @@ By contrast, the big-state construction is tailored for small to moderate weight
 
 The key insight of the big-state construction is to generalize the standard single point DPF protocol of \sectionref{sec:dpf} such that the ``tag bit'' vector that marks the active child on each level becomes a set of $t$ \emph{tag vectors}. Instead of each node $i$ carrying a single bit $\tau_i$ that determines which child is ``active,'' each node $i$ in the evaluation tree maintains  $t$ tag bits $\tau_{1,i},...,\tau_{t,i}$. As before, each tag vector is a unit vector, i.e. $|\tau_j|=1$. However, there are now $t$ check vectors and therefore there can be $t$ active children on each level.
 
-\begin{figure}\small
+\begin{figure}[H]\small
 	\centering
 	\fbox{ \begin{minipage}{.95\textwidth}
     For public parameters $\kappa,n,w\in \mathbb{N}$, group $\mathbb{G}$, PRG $\mathsf{G}:\{0,1\}^\kappa \rightarrow\{0,1\}^{2t+2\kappa}$ , $D:=\lceil \log_w(n)\rceil$.\\
     
-    \textsf{bigstate-DPF}: On input $\share{A}\in [0,n)^t,\share{B}\in \mathbb{G}^t$, party $p\in \{0,1\}$ computes:
+    \textsf{bigstate-DPF}: On input $\share{A}\in [0,n)^t,\share{B}\in \mathbb{G}^t$.
+    \par\smallskip
+    Party $p\in \{0,1\}$ computes:
     \begin{enumerate}
         \item $\share{\pi} := \sort(\share{A}), \share{A}:= \perm(\share{\pi},\share{A}), \share{B}:=\perm(\share{\pi},\share{B})$.
         \item $\share{s^0_{0}}\gets \{0,1\}^\kappa$
@@ -39,7 +41,8 @@ The key insight of the big-state construction is to generalize the standard sing
         \end{enumerate}
     \end{enumerate}
     \vspace{10px}
-    \SharedIPD: On input $\share{u}\in \{x\in\{0,1\}^m \mid |x|\leq 1\}$ and $\share{v}\in \{x\in\{0,1\}^m \mid |x|\leq t\}$, the parties $p\in \{0,1\}$ compute:
+    \SharedIPD: On input $\share{u}\in \{x\in\{0,1\}^m \mid |x|\leq 1\}$ and $\share{v}\in \{x\in\{0,1\}^m \mid |x|\leq t\}$.\\
+    The parties $p\in \{0,1\}$ compute:
     \begin{enumerate}
         \item select $s,s'\in \mathbb{N}$ s.t. $(1-(1-1/T)^{t-1})^s(1-2^{-s'})^s=\mathsf{negl}$ where $T:=\lceil\log_2(e)t\rceil\approx 1.44t$
         \item for $i\in [s]$, let $P_i:=(P_{i,1},...,P_{i,T})$ where $P_{i,j} \gets \mathsf{powerSet}([m])$ s.t. $P_{i,j}\cap P_{i,j'}=\emptyset$ for all $j\neq j'$ and $\bigcup_j P_{i,j} = [m]$

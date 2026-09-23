@@ -1,7 +1,34 @@
 \begin{abstract}
-We introduce new \emph{Distributed Multi-Point Function} (DMPF) constructions that make multi-point sharing as practical as the classic single-point (DPF) case. Our main construction, \emph{Reverse Cuckoo}, replaces the ``theoretical'' cuckoo insertions approach to DMPFs with a MPC-friendly linear solver that circumvents the concrete inefficiencies. Combined with our new sparse DPF construction, we obtain the first fully distributed and efficient DMPF key generation that avoids trusted dealers and integrates cleanly with standard two-party MPC.
+We give fully distributed multi-point function (DMPF) constructions that
+share a sparse map over a domain of size $N$.
+Setup takes secret-shared indices; each later expansion takes new payloads
+for those indices and returns shares of the map.
+Our main construction, Waterfall Cuckoo, samples public hashes before
+assigning the inputs to bins. An occupancy scan followed by bounded repair
+finds the assignment; a hidden permutation conceals it during routing.
+Sparse DPFs then provide $4N$ or $3N$ leaf work per expansion, replacing the
+$tN$ work of $t$ independent DPFs.
+We prove correctness and semi-honest simulation in the ideal-subprotocol
+model, with an explicit routing-error bound.
 
-Applied to pseudorandom correlation generators (PCGs), our DMPFs remove the dominant “sum of $t$ DPFs'' bottleneck. In Ring-LPN and Stationary-LPN pipelines (Crypto 2020, 2025), this translates to \emph{an order of magnitude more Beaver triples per second} with \emph{an order of magnitude less communication} compared to the status quo by Keller et al (Eurocrypt 2018). The gains persist across fields and rings ($\mathbb{F}_{p^k}$, $\mathbb{Z}_{2^k}$ for $k\geq 1$) and are complementary to existing PCG frameworks: our constructions drop in as a black-box replacement for their sparse multi-point steps, accelerating \emph{all} PCGs that rely on such encodings.
+For the random sparse supports in Ring-LPN PCGs, we also give Reverse Cuckoo,
+a $2N$-expansion specialization. It programs hashes around a hidden placement
+and leaks information about the support: in the ideal hash model, outputs
+are weighted by their number of valid placements.
+We characterize the idealized leakage, state the additional decisional
+Ring-LPN assumption, and evaluate leakage-aware decoding attacks.
+A separate analysis bounds the concrete hash evaluator's batch correctness
+error below $2^{-40}$ at the filtered degree-$2^{20}$ parameter point.
 
-We provide a complete protocol suite (deduplication, hashing, linear solver, sparse DPF instantiation) and characterize the support leakage of its public hash descriptors as a size-biased cuckoo channel. For the Ring-LPN application we state the required leakage-robust Ring-LPN assumption explicitly, while a prototype implementation validates the asymptotics with strong concrete performance improvements.
+Our measurements use an earlier implementation of this specialized
+Reverse-Cuckoo pipeline. They predate the fresh-mask update, support-rejection
+filter, and AES rekeying described here.
+At degree $2^{20}$ it produces 1.81 million Goldilocks-field OLEs per second,
+with 12.99 MB communicated per expansion.
+Against the reported FHE baseline at the same field and degree, these figures
+give $6.57\times$ higher throughput and $13.60\times$ lower expansion
+communication. Setup costs and comparisons with the sum-of-DPFs baseline
+are reported separately.
+Waterfall's costs are modeled; gains for other fields, rings, and PCG
+constructions remain application-dependent.
 \end{abstract}

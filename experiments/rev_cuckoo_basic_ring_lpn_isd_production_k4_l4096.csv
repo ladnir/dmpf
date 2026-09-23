@@ -1,0 +1,2 @@
+weight,block_length,ring_dimension,partition_size,modulus,selector_k,trials,pair_rounds,center_rounds,pair_slope,pair_r_squared,expected_work_gain_bits,expected_beta,half_success_gain_bits,half_beta,center_mean_hits,center_expected_work_gain_bits,center_expected_alpha,center_half_success_gain_bits,center_half_alpha,seconds,seed
+16,4096,65536,16,65537,4,16,8,0,-0.3341453433517946,0.5984259811232537,0.0453514189949145,0.5,0.08880006885372221,1.0,0.0,0.0,0.0,0.0,0.0,181.04528479999863,20260810

@@ -1,0 +1,604 @@
+\section{Waterfall Cuckoo DMPF}\label{sec:waterfallCuckoo}
+
+\subsection{Intuition}\label{sec:waterfallCuckooIntuition}
+
+Waterfall Cuckoo combines the partitioned sparse-DPF layout of
+\sectionref{sec:cuckoo} with a fixed MPC-friendly routing rule.  Its setup has
+four stages.
+
+\paragraph{Normalize the rows.}
+Setup retains the first row containing each real address and replaces every
+other address by the dummy address $N$.  Each expansion sums duplicate
+payloads into the retained row and assigns zero to every dummy row.  The fixed
+row order supplies the priority used by the placement algorithm.
+
+\paragraph{Sample candidates directly.}
+For each partition, setup samples a public $t$-wise independent hash function.
+It evaluates the hash on every real address and replaces every dummy-row result
+by fresh uniform randomness.  The resulting candidate matrix is exactly
+uniform for every support. The public hashes are sampled before routing and
+are neither conditioned on placement success nor retried.
+
+\paragraph{Place the rows.}
+The rows scan the partitions in order.  In each partition, the first live row
+proposing an unoccupied bin is placed there; rows that collide remain live and
+fall to the next partition.  After this initial waterfall stage,
+$\mathsf{WaterfallGen}_{\mathbf d,c,r}$ performs $r$ canonical complete
+augmentations.  Each augmentation searches for an alternating path from the
+currently unplaced rows to a free main bin and flips one such path.
+It then compacts any remaining rows into
+the $c$ stash positions.  A row left unplaced after these steps causes a
+correctness error; the protocol neither aborts nor retries.
+
+\paragraph{Materialize and expand.}
+The placement is hidden by an exactly uniform secret permutation and then
+opened. On successful routing, the opened placement is a uniform injection, independent of
+the true candidate bins.  The opened injection permits a public scatter of the
+secret records.  Setup initializes one reusable sparse DPF for each resulting
+column.  Later expansions supply only new payloads and reuse all routing and
+DPF state.
+
+Fix partition sizes $\mathbf d=(d_0,\ldots,d_{w-1})$, stash capacity $c$, and
+repair budget $r$. Require $w,t,N\geq1$, $c,r\geq0$, and
+$d_s=2^{k_s}$ with $0\leq k_s\leq\max\{1,\lceil\log_2N\rceil\}$.
+Define
+\[
+ \Delta_s:=\sum_{u<s}d_u,
+ \qquad
+ m:=\sum_{s\in[0,w)}d_s+c.
+\]
+Require $m\geq t$. These parameters expose three distinct costs.  The repeated local expansion
+is $(w+c)N+\operatorname{poly}(t)$, because each partition and stash entry
+contributes one full-domain traversal.  The stored position map has $m$
+physical columns.  The one-time MPC setup cost depends on the partition sizes
+and on $r$. Our default profile uses fewer physical columns and $4N$
+local expansion; the lower-expansion profile uses $3N$ at a larger setup cost.
+
+Formally, a \emph{Waterfall profile} is
+$\Gamma=(\mathbf d,c,r)$, and
+\begin{equation}\label{eq:waterfall-generator-interface}
+ \mathsf{WaterfallGen}_{\mathbf d,c,r}:
+ \prod_{s\in[0,w)}[0,d_s)^t\longrightarrow\{0,1\}^{t\times m}
+\end{equation}
+is the deterministic circuit described below.  Its output $O$ is a partial
+placement: every row and column has weight at most one; a selected main
+position for row $i$ is one of $(s,C_{i,s})_{s\in[0,w)}$; and every stash
+position is admissible.  Define
+\begin{equation}\label{eq:waterfall-generator-success}
+ \mathsf{Good}_\Gamma(C):=
+ \bigl[\forall i\in[0,t),\ \lVert O_i\rVert_1=1\bigr],
+ \qquad O:=\mathsf{WaterfallGen}_{\mathbf d,c,r}(C).
+\end{equation}
+The correctness and simulation proofs use only these interface properties and
+the probability of $\neg\mathsf{Good}_\Gamma$.
+
+\subsection{Direct hash sampling}\label{sec:waterfallHashSampling}
+
+Let $\ell:=\max\{1,\lceil\log_2N\rceil\}$ and fix a public injection
+$\iota:[0,N)\hookrightarrow\mathbb F_{2^\ell}$.  Extend its evaluator by
+$\iota(N):=0$; injectivity is required only on the real domain.  For
+$k\leq\ell$, let $\operatorname{trunc}_k$ return the first $k$ coordinates in
+a fixed binary basis.  Distribution $\mathcal H_{t,k}$ samples
+$\alpha\gets\mathbb F_{2^\ell}^t$ and returns the restriction to $[0,N)$ of
+\begin{equation}\label{eq:waterfall-direct-hash-family}
+ h_\alpha(x):=\operatorname{trunc}_k\!\left(
+   \sum_{j=0}^{t-1}\alpha_j\iota(x)^j\right).
+\end{equation}
+For any $\tau\leq t$ distinct inputs, the Vandermonde evaluation map from
+$\alpha$ to the corresponding $\tau$ field values is surjective with equal
+fiber sizes.  The values are therefore independent and uniform.  Truncation
+preserves independence and makes every output uniform in
+$\mathbb F_2^k\cong[0,2^k)$.
+
+Let $d_s=2^{k_s}$.  For a deduplicated address vector $A^*$, setup samples
+independent $h_s\gets\mathcal H_{t,k_s}$ and $U_{i,s}\gets[0,d_s)$, and sets
+\begin{equation}\label{eq:waterfall-candidate-matrix}
+ C_{i,s}:=\begin{cases}
+ h_s(A_i^*),&A_i^*\neq N,\\
+ U_{i,s},&A_i^*=N.
+ \end{cases}
+\end{equation}
+The direct family need not treat $N$ as a distinct field point because a
+dummy row never contributes a hash evaluation to $C$.
+
+\begin{lemma}[Uniform candidate matrix]\label{lem:waterfall-uniform-candidates}
+For every fixed deduplicated address vector $A^*$, the matrix $C$ is uniform
+in $\prod_{s\in[0,w)}[0,d_s)^t$.
+\end{lemma}
+
+\begin{proof}
+The real addresses are distinct, so their values within each partition are
+independent and uniform by $t$-wise independence.  The hash seeds are
+independent across partitions.  Every dummy entry is selected from an
+independent cell of $U$.  These values cover all entries of $C$.
+\end{proof}
+
+This construction handles arbitrary $N$ without enlarging the DMPF domain to
+a power of two.  Power-of-two candidate ranges are used only to implement the
+hash outputs and secret-index circuits efficiently.
+
+\subsection{Protocol}\label{sec:waterfallCuckooProtocol}
+
+The protocol has one address-dependent setup and a reusable expansion.  The
+protocol box declares the retained state; named DPF instances retain their own
+leaf seeds and expansion counters.  The notation $\textsf{eq}(x,y)$ denotes a
+Boolean equality circuit, and $\textsf{reveal}$ opens a shared value to both
+parties.
+
+\begin{figure}[H]\footnotesize
+\centering
+\fbox{\begin{minipage}{.95\textwidth}
+ For public parameters $\kappa,N,t\in\mathbb N$, a finite additive group
+ $\mathbb G$, and a Waterfall profile $\Gamma=(\mathbf d,c,r)$, let
+ $m:=\sum_{s\in[0,w)}d_s+c$.
+ Party $p\in\{0,1\}$ stores its local component of
+ $\mathsf{st}_\Gamma=(\share\delta,\share e,h,P,S)$, initially undefined.
+ The instance owns named reusable DPF instances
+ $\mathsf{DPF}^{\mathsf{col},j}$ over $S_j$ whenever $S_j\neq\emptyset$.
+ \par\medskip
+
+ \noindent
+ $\mathsf{WaterfallCuckoo}_{\Gamma}.\mathsf{Setup}
+ \bigl(\share A\in\mathcal X_N^t\bigr)
+ \longrightarrow\mathsf{ready}$.
+ \par\smallskip
+ Party $p\in\{0,1\}$ computes:
+
+\begin{enumerate}[nosep]
+  \item If setup has already completed, return $\bot$.
+  \item For $i\in[0,t)$, set $\share e_{i,i}:=1$.  For $i<j$, set
+  $\share e_{i,j}:=\textsf{eq}(\share A_i,\share A_j)$ and
+  $\share e_{j,i}:=\share e_{i,j}$.
+  \item For $i\in[0,t)$, set
+  $\share\delta_i:=(1-\textsf{eq}(\share A_i,N))
+  \bigwedge_{j<i}(1-\share e_{i,j})$.
+  \item For $i\in[0,t)$, set
+  $\share A_i^*:=N\oplus\share\delta_i(N\oplus\share A_i)$.
+  \item For $s\in[0,w)$, sample public $h_s\gets\mathcal H_{t,k_s}$.
+  \item For $(i,s)\in[0,t)\times[0,w)$, sample
+  $\share U_{i,s}\gets[0,d_s)$.
+  \item For $(i,s)\in[0,t)\times[0,w)$, set
+  $\share C_{i,s}:=\share U_{i,s}\oplus
+  \share\delta_i(\share U_{i,s}\oplus h_s(\share A_i^*))$.
+  \item $\share O:=\mathsf{WaterfallGen}_{\mathbf d,c,r}(\share C)$.
+  \item Define $P\in\{0,1\}^{[0,N)\times m}$ by
+  $P_{x,\Delta_s+h_s(x)}:=1$ for $(x,s)\in[0,N)\times[0,w)$ and
+  $P_{x,\Delta_w+k}:=1$ for $(x,k)\in[0,N)\times[0,c)$, with all remaining
+  entries zero.
+  \item For $j\in[0,m)$, let
+  $S_j:=\{x\in[0,N):P_{x,j}=1\}$ and $S:=(S_j)_{j\in[0,m)}$.
+  \item $\share A':=
+  \mathsf{WaterfallScatter}_{\mathbf d,c}.\mathsf{Setup}
+  (\share A^*,\share\delta,\share O,P,S)$.
+  \item For $j\in[0,m)$ with $S_j\neq\emptyset$, invoke
+  $\mathsf{DPF}^{\mathsf{col},j}.\mathsf{Setup}_{S_j}(\share A'_j)$.
+  \item Store $\mathsf{st}_\Gamma:=(\share\delta,\share e,h,P,S)$ and
+  return $\mathsf{ready}$.
+\end{enumerate}
+
+\par\medskip
+\noindent
+$\mathsf{WaterfallCuckoo}_{\Gamma}.\mathsf{Expand}
+ \bigl(\share B\in\mathbb G^t\bigr)
+ \longrightarrow\share y\in\mathbb G^{[0,N)}$.
+\par\smallskip
+Party $p\in\{0,1\}$ computes:
+
+\begin{enumerate}[nosep]
+  \item If setup has not completed, return $\bot$.  Otherwise, read
+  $\mathsf{st}_\Gamma$.
+  \item For $i\in[0,t)$, set
+  $\share B_i^*:=\share\delta_i
+  \sum_{j\in[0,t)}\share e_{i,j}\share B_j$.
+  \item $\share B':=
+  \mathsf{WaterfallScatter}_{\mathbf d,c}.\mathsf{Expand}(\share B^*)$.
+  \item For $j\in[0,m)$ with $S_j\neq\emptyset$, set
+  $\share y'_j:=
+  \mathsf{DPF}^{\mathsf{col},j}.\mathsf{Expand}_{S_j}(\share B'_j)
+  \in\mathbb G^{S_j}$.
+  \item For $x\in[0,N)$, set
+  $\share y(x):=\sum_{j:x\in S_j}\share y'_j(x)$.
+  \item Return $\share y$.
+\end{enumerate}
+\end{minipage}}
+\caption{The reusable Waterfall-Cuckoo distributed multi-point protocol.
+Setup samples and routes one candidate matrix without retry.  Expansion reuses
+the resulting address-dependent state for any polynomial number of payload
+vectors.\label{fig:waterfallCuckoo}}
+\end{figure}
+
+All index-dependent DPF OTs and tree expansions occur during setup.
+Expansion uses the cached equality matrix to aggregate duplicate payloads
+and each DPF's internal counter for leaf conversion. The permutation
+correlations are used only during setup.
+
+\subsection{Placement generator}\label{sec:waterfallRoute}
+
+The initial waterfall stage uses one secret occupancy array per partition.
+Set $a_i^{(0)}:=1$ for every row.  For partition $s$, initialize
+$T_s^{(0)}:=0^{d_s}$ and scan $i=0,\ldots,t-1$.  Secret-index reads and gated
+unit vectors implement
+\begin{align}
+ o_i^{(s)}&:=T_s^{(i)}[C_{i,s}],
+ &\ell_i^{(s)}&:=a_i^{(s)}o_i^{(s)},\nonumber\\
+ u_i^{(s)}&:=a_i^{(s)}(1-o_i^{(s)}),
+ &a_i^{(s+1)}&:=\ell_i^{(s)},\label{eq:waterfall-state-transition}\\
+ E_i^{(s)}&:=\unitVec_{[0,d_s)}(C_{i,s},u_i^{(s)}),
+ &T_s^{(i+1)}&:=T_s^{(i)}\oplus E_i^{(s)}.\nonumber
+\end{align}
+The bit $u_i^{(s)}$ places row $i$ in partition $s$, while
+$a_i^{(s+1)}$ records that it remains live.  The update is valid because
+$u_i^{(s)}=1$ only when the selected cell was previously zero.  The resulting
+main-position matrix is
+\begin{equation}\label{eq:waterfall-main-owner}
+ O^{(0)}_{i,\Delta_s+b}:=
+ u_i^{(s)}[C_{i,s}=b].
+\end{equation}
+
+After the scan, $q_i:=a_i^{(w)}$ identifies the overflow rows and
+\begin{equation}\label{eq:waterfall-stash-rank}
+ R_i:=\sum_{j<i}q_j
+\end{equation}
+is their stable rank.  Stash compaction places the first $c$ remaining rows:
+\begin{equation}\label{eq:waterfall-stash-owner}
+ O_{i,\Delta_w+k}:=q_i[R_i=k],
+ \qquad k\in[0,c).
+\end{equation}
+The case $r=0$ stops after this initial stage; it is a parameter choice, not a
+separate scheme.
+
+For complete repair, view the main positions as the right vertices of the
+bipartite candidate graph
+\begin{equation}\label{eq:waterfall-candidate-graph}
+ G_C:=\bigl([0,t),\ [0,\Delta_w),\
+ \{(i,\Delta_s+C_{i,s}):(i,s)\in[0,t)\times[0,w)\}\bigr).
+\end{equation}
+Starting from the initial matching $O^{(0)}$, one canonical augmentation treats
+every unmatched row as a root of an alternating-path search.  It expands the
+first discovered but unexpanded row in public row order, scans that row's
+partitions in public order, and records the first parent of each newly
+discovered owner.  The first free candidate ends the search.  If one is found,
+the circuit flips its unique parent path; otherwise it leaves the matching
+unchanged.  Thus one complete round repairs one unmatched row whenever any
+augmenting path exists.  Repeating the round $r$ times repairs at most $r$
+rows. Recompute $q_i$ from the repaired matching and apply the same
+stash-rank and compaction formulas to the remaining rows.
+All loop bounds and tie-breaking rules are public, so this is a
+deterministic circuit.  \appendixref{app:waterfall-details} gives the
+gate-level circuit and its invariant proof.
+
+Every intermediate and final matrix satisfies
+\begin{equation}\label{eq:waterfall-placement-invariants}
+ \sum_{j\in[0,m)}O_{i,j}\leq1,
+ \qquad
+ \sum_{i\in[0,t)}O_{i,j}\leq1,
+\end{equation}
+and, for the position map defined in \figureref{fig:waterfallCuckoo},
+\begin{equation}\label{eq:waterfall-placement-subset}
+ A_i^*\neq N\ \land\ O_{i,j}=1
+ \quad\Longrightarrow\quad P_{A_i^*,j}=1.
+\end{equation}
+
+\begin{proposition}[Complete-repair criterion]
+\label{prop:waterfall-reachability-repair}
+Sample $C\gets\prod_{s\in[0,w)}[0,d_s)^t$ and put
+\[
+ p_\Gamma:=\Pr_C[\neg\mathsf{Good}_\Gamma(C)].
+\]
+Let $L$ be the number of rows left unmatched by the initial waterfall stage.
+If $G_C$ has a matching of size $t$ and $L\leq r+c$, then
+$\mathsf{WaterfallGen}_{\mathbf d,c,r}$ returns a valid placement.  Hence
+\begin{equation}\label{eq:waterfall-reachability-rejection}
+ p_\Gamma\leq
+ \Pr[L>r+c]+\Pr[G_C\text{ has no matching of size }t].
+\end{equation}
+\end{proposition}
+
+\begin{proof}
+If at most $c$ rows remain, stash compaction places all of them.  Otherwise,
+the current main-bin matching has size below $t-c$.  Berge's lemma gives an
+augmenting path whenever $G_C$ has a matching of size $t$.  A complete repair
+round searches from every unmatched root, finds and flips such a path, and
+increases the matching size by one.
+Induction over $r$ rounds leaves at most $c$ unmatched rows whenever
+$L\leq r+c$.
+\end{proof}
+
+\subsection{Oblivious record scatter}\label{sec:waterfallScatter}
+
+The secret matrix $O$ is a partial injection of the $t$ labeled rows into the
+$m$ columns.  Directly multiplying every record by every entry would require
+$tm$ conditional moves of full records.  Waterfall instead hides the selected
+columns by two serial permutation networks.
+
+Let $\mathsf{Inj}(t,m)$ be the set of injections $[0,t)\to[0,m)$.  Party $p$
+samples a uniform permutation $\sigma_p\gets\mathbb S_m$ and privately
+programs one Waksman network.  The two passes apply
+\begin{equation}\label{eq:waterfall-serial-permutation}
+ \rho:=\sigma_1\circ\sigma_0.
+\end{equation}
+Conditioned on either party's permutation, the other permutation remains
+uniform.  Composition by the fixed permutation is a bijection on
+$\mathbb S_m$.  Thus for every $o,v\in\mathsf{Inj}(t,m)$,
+\begin{equation}\label{eq:waterfall-opened-placement-probability}
+ \Pr[\rho\circ o=v\mid\sigma_p]
+ =\frac{(m-t)!}{m!}=\frac1{(m)_t}.
+\end{equation}
+The opened matrix
+\begin{equation}\label{eq:waterfall-opened-placement}
+ \widehat O_{i,\rho(j)}:=O_{i,j}
+\end{equation}
+is therefore an exactly uniform labeled injection on
+$\mathsf{Good}_\Gamma(C)$, for every fixed true placement and either party's
+permutation.  This statement is in the ideal permutation hybrid, before the
+opening, where the returned shares hide the honest permutation.
+It is essential that $O$ includes the physical
+placements of dummy rows; otherwise the opening would reveal the number of
+real rows.
+
+The opened matrix scatters the shared activity bits and masked addresses using
+public wiring and linear operations.  Applying the inverse serial passes
+restores their true columns.  The destination of row $i$ is
+\begin{equation}\label{eq:waterfall-row-destination}
+ z_i:=\sum_{j\in[0,m)}jO_{i,j}\in[0,m).
+\end{equation}
+Setup initializes a reusable DPF for each $z_i$.  During every expansion,
+\begin{equation}\label{eq:waterfall-value-scatter}
+ \share v_i:=\mathsf{DPF}^{\mathsf{sc},i}.\mathsf{Expand}_{[0,m)}(\share B_i),
+ \qquad
+ \share B'_j:=\sum_{i\in[0,t)}\share v_i(j).
+\end{equation}
+For every column, let
+\begin{equation}\label{eq:waterfall-scatter-representative}
+ D_j:=\begin{cases}\min S_j,&S_j\neq\emptyset,\\0,&S_j=\emptyset,\end{cases}
+ \qquad A'_j:=\bar A_j+(1-\chi_j)D_j.
+\end{equation}
+A real row preserves its address and payload.  An unused column or physical
+dummy receives a public representative and zero payload.
+
+\begin{figure}[H]\scriptsize
+\centering
+\fbox{\begin{minipage}{.95\textwidth}
+ For public $N,t\in\mathbb N$, partition sizes
+ $\mathbf d=(d_s)_{s\in[0,w)}$, and stash capacity $c$, let
+ $m:=\sum_{s\in[0,w)}d_s+c$.  The public sparse sets satisfy
+ $S=(S_j)_{j\in[0,m)}$ and $S_j=\{x:P_{x,j}=1\}$.
+ Party $p\in\{0,1\}$ stores its local component of
+ $\mathsf{st}_{\mathsf{sc}}=(\share z,
+ (\mathsf{DPF}^{\mathsf{sc},i})_{i\in[0,t)})$, initially undefined.
+ Each $\mathsf{DPF}^{\mathsf{sc},i}$ is reusable over $[0,m)$.
+ \par\medskip
+
+ \noindent
+ $\begin{aligned}
+ &\mathsf{WaterfallScatter}_{\mathbf d,c}.\mathsf{Setup}\bigl(
+   \share A\in\mathcal X_N^t,
+   \share\delta\in\{0,1\}^t,
+   \share O\in\{0,1\}^{t\times m},\\[-0.2em]
+ &\qquad P\in\{0,1\}^{[0,N)\times m},
+   S\in(2^{[0,N)})^m\bigr)
+   \longrightarrow\share A'\in[0,N)^m.
+ \end{aligned}$
+ \par\smallskip
+ Party $p\in\{0,1\}$ computes:
+
+\begin{enumerate}[nosep]
+  \item If setup has already completed, return $\bot$.
+  \item Sample $\sigma_p\gets\mathbb S_m$ and privately program Waksman pass
+  $p$ for $\sigma_p$.  Let $\share\rho:=\sigma_1\circ\sigma_0$ denote the two
+  serial hidden passes.
+  \item $\share{\widehat O}:=
+  \textsf{permute}_{\share\rho}(\share O)$ along its column dimension.
+  \item $\widehat O:=\textsf{reveal}(\share{\widehat O})$.
+  \item For $i\in[0,t)$, set
+  $\share z_i:=\sum_{j\in[0,m)}j\share O_{i,j}\in[0,m)$.
+  \item For $i\in[0,t)$, set
+  $\share{\widetilde A_i}:=\share\delta_i\share A_i$.
+  \item For $k\in[0,m)$, set
+  $\share{\widehat\chi_k}:=
+  \sum_{i\in[0,t)}\widehat O_{i,k}\share\delta_i$.
+  \item For $k\in[0,m)$, set
+  $\share{\widehat A_k}:=
+  \sum_{i\in[0,t)}\widehat O_{i,k}\share{\widetilde A_i}$.
+  \item $(\share\chi,\share{\bar A}):=
+  \textsf{permute}_{\share\rho}^{-1}
+  (\share{\widehat\chi},\share{\widehat A})$.
+  \item For $j\in[0,m)$, set
+  $D_j:=\min S_j$ if $S_j\neq\emptyset$ and $D_j:=0$ otherwise.
+  \item For $j\in[0,m)$, set
+  $\share A'_j:=\share{\bar A_j}+(1-\share\chi_j)D_j$.
+  \item For $i\in[0,t)$, invoke
+  $\mathsf{DPF}^{\mathsf{sc},i}.\mathsf{Setup}_{[0,m)}(\share z_i)$.
+  \item Store $\mathsf{st}_{\mathsf{sc}}:=(\share z,
+  (\mathsf{DPF}^{\mathsf{sc},i})_{i\in[0,t)})$ and return $\share A'$.
+\end{enumerate}
+
+\par\medskip
+\noindent
+$\mathsf{WaterfallScatter}_{\mathbf d,c}.\mathsf{Expand}
+ \bigl(\share B\in\mathbb G^t\bigr)
+ \longrightarrow\share B'\in\mathbb G^m$.
+\par\smallskip
+Party $p\in\{0,1\}$ computes:
+
+\begin{enumerate}[nosep]
+  \item If setup has not completed, return $\bot$.
+  \item For $i\in[0,t)$, set
+  $\share v_i:=\mathsf{DPF}^{\mathsf{sc},i}.\mathsf{Expand}_{[0,m)}(\share B_i)
+  \in\mathbb G^{[0,m)}$.
+  \item For $j\in[0,m)$, set
+  $\share B'_j:=\sum_{i\in[0,t)}\share v_i(j)$.
+  \item Return $\share B'$.
+\end{enumerate}
+\end{minipage}}
+\caption{Reusable permutation-assisted scatter into the unified position map.
+Setup fixes the destinations and initializes their DPF states.  Expansion
+supplies only a new payload vector.\label{fig:waterfallScatterProtocol}}
+\end{figure}
+
+The forward permutation carries the $t$-bit columns of $O$.  The inverse pass
+carries records of width $1+\lceil\log_2(N+1)\rceil$.  The same switch
+correlations support both directions by domain-separated PRG expansion
+\cite{permCor}.  The correlated permutations act only during setup.
+
+\subsection{Correctness and simulation}\label{sec:waterfallSecurity}
+
+For $\Gamma=(\mathbf d,c,r)$, define
+\begin{equation}\label{eq:waterfall-generator-rejection}
+ p_\Gamma:=\Pr_{C\gets\prod_{s\in[0,w)}[0,d_s)^t}
+ [\neg\mathsf{Good}_\Gamma(C)].
+\end{equation}
+Fix polynomials $B_0(\kappa)$ and $Q(\kappa)$.  The protocol initializes
+$B_0$ independent Waterfall states and performs at most $Q$ expansions per
+state.  Let $\epsilon_{\mathsf{corr}}(B_0,Q)$ and
+$\epsilon_{\mathsf{sub}}(B_0,Q)$ bound the combined correctness error and
+simulation advantage of the invoked MPC, permutation, PRG, and reusable DPF
+subprotocols.
+
+We prove simulation in the hybrid model with ideal circuit, permutation, and
+reusable DPF calls.  Each call exposes only its specified outputs; secret
+circuit and permutation outputs use fresh additive or XOR shares.  Locally
+derived values and reused shares retain their prescribed dependencies.
+The implementation state of an ideal subprotocol is internal to that
+functionality.  Its concrete realization is covered by its own simulator,
+not simulated again in the Waterfall hybrid.
+At a DPF call, the corrupt party supplies its own output share according to
+\figureref{fig:DpfFunc}. A concrete DPF simulator supplies that share when
+we replace a concrete call by its ideal functionality. These choices may
+depend on the preceding view; we require no independent output-sharing law.
+
+\begin{proposition}[Waterfall correctness]\label{prop:waterfall-correctness}
+For arbitrary setup inputs $A^{(b)}\in\mathcal X_N^t$ and payload vectors
+$B^{(b,q)}\in\mathbb G^t$, all $B_0Q$ outputs equal
+$\mathsf{mp}_{N,t}(A^{(b)},B^{(b,q)})$ except with probability at most
+\[
+ B_0p_\Gamma+\epsilon_{\mathsf{corr}}(B_0,Q).
+\]
+The routing term is paid once per cached state, not once per expansion.
+\end{proposition}
+
+\begin{proof}
+Condition on $\mathsf{Good}_\Gamma(C)$ and correct execution of the reused
+subprotocols.  The placement invariants imply that every row has one distinct
+admissible column.  For a real row, its selected main candidate equals
+$h_s(A_i^*)$; every stash column admits all real addresses.  The inverse
+permutation passes cancel the forward passes, and the reusable DPF for $z_i$
+places $B_i^*$ in the selected column during every expansion.  Activity bits
+preserve real addresses and replace physical dummies and unused columns by
+public representatives with zero payload.  The final pointwise sum therefore
+equals $\mathsf{mp}_{N,t}(A,B)$.  A union bound over the $B_0$ independently
+routed states proves the claim.
+\end{proof}
+
+\begin{theorem}[Generic Waterfall-Cuckoo simulation]
+\label{thm:waterfall-simulation}
+Against either static semi-honest corrupted party, Waterfall Cuckoo realizes
+$\mathcal F_{\mathsf{rDMPF}}$ for $B_0$ independently initialized states and
+at most $Q$ adaptive expansions per state.  For every PPT adversary, there is
+a PPT simulator whose distinguishing advantage satisfies
+\begin{equation}\label{eq:waterfall-batch-security}
+ \operatorname{Adv}_{\mathsf{WF}}(B_0,Q)
+ \leq B_0p_\Gamma+\epsilon_{\mathsf{sub}}(B_0,Q).
+\end{equation}
+The simulator receives the corrupted party's input shares and submits its
+output share to the functionality, as specified after \figureref{fig:dmpfFunc}.
+The claim uses no LPN or
+syndrome-decoding assumption.
+\end{theorem}
+
+\begin{proof}
+Fix the corrupted party $p$.  In the ideal-subprotocol hybrid, the simulator
+samples the public hashes with their original law and computes $P,S$ locally.
+It samples private outputs of the ideal setup calls according to their sharing
+interfaces and evaluates local operations on those shares.  For the placement
+opening, it samples a uniform labeled injection $V\gets\mathsf{Inj}(t,m)$.
+If party $p$ holds opening share $\widehat O_p$, the simulated honest message
+is $V\oplus\widehat O_p$.
+
+On successful routing this opening has exactly the required distribution by
+\equationref{eq:waterfall-opened-placement-probability}.  The simulator does
+not condition or retry the public hashes.  Couple its opening to the real
+opening whenever routing succeeds; replacing the entire transcript of a
+failed state costs at most $p_\Gamma$ by
+\namedref{Lemma}{lem:waterfall-uniform-candidates}.
+
+During expansion, the simulator samples the fresh circuit-output shares
+for duplicate aggregation and computes all local sums. It runs the corrupt
+party's share-selection strategy at each row-to-column and column DPF call.
+It sums the resulting column maps exactly as the protocol does and submits
+that sum as its DMPF output share. On successful routing, correctness makes
+the honest output its required complement. No output map is prescribed to
+the simulator. \appendixref{app:waterfall-simulator} gives the call-by-call
+argument, including the joint distribution of the honest output and corrupt
+view. The simulator retains its state for subsequent adaptive expansions.
+
+The hybrid simulator therefore uses only the corrupted party's inputs and
+the simulated history. A union bound charges failed routing once for each of the $B_0$
+states, not once per expansion.  Replacing the ideal calls by their concrete
+realizations and subprotocol simulators adds at most
+$\epsilon_{\mathsf{sub}}(B_0,Q)$, proving the claim.
+\end{proof}
+
+\subsection{Profiles and concrete cost}\label{sec:waterfallParameters}
+
+For every partition $s$, the sets
+$\{S_{\Delta_s+b}:b\in[0,d_s)\}$ partition $[0,N)$.  Every stash column has
+$S_j=[0,N)$.  Hence
+\begin{equation}\label{eq:waterfall-position-map-size}
+ \sum_{j\in[0,m)}|S_j|=(w+c)N,
+\end{equation}
+and the repeated local expansion work is
+\begin{equation}\label{eq:waterfall-expansion-cost}
+ (w+c)N+\operatorname{poly}(t).
+\end{equation}
+
+\tableref{tab:waterfall-parameters} reports the two main profiles at $t=16$,
+$B_0=256$, $N=2^{20}$, $\kappa=128$, and $\mathbb G=\mathbb Z_{2^{64}}$. ``Batch
+bits'' means $-\log_2(B_0p_\Gamma)$. The OT columns give a per-state upper
+bound on initial correlations for direct hashing, placement, scatter, and
+reusable DPF initialization. The batch size $B_0$ enters only the correctness
+bound.
+The DPF term reserves two OTs per shared correction selection, activity
+masks below the dense prefix, and cached sign-conversion correlations.
+A shared bit times a shared string uses two OTs; the string width contributes
+to the logical OT payload. For retained control bits, later multiplications
+expand cached OT strings with round-separated PRGs and send masked payloads,
+without obtaining new OTs. The model excludes public openings, OT-extension
+overhead, and local computation; it is not a measurement of setup time or
+total wire traffic.
+\appendixref{sec:waterfallMpcCost} gives the exact
+occupancy, Hall-witness, and component-cost calculations.
+
+\begin{table}[H]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lrrrrrrr@{}}
+\toprule
+profile & $\mathbf d$ & $(c,r)$ & $m$ & expansion & total OTs & OT payload & batch bits \\
+\midrule
+default $4N$ & $(16,16,16,16)$ & $(0,3)$ & 64 & $4N$ & 39{,}052 & 942{,}888 bits & 43.37 \\
+lower-expansion $3N$ & $(128,128,64)$ & $(0,2)$ & 320 & $3N$ & 55{,}358 & 3{,}623{,}410 bits & 41.13 \\
+\bottomrule
+\end{tabular}
+\caption{Main Waterfall profiles.  Both use the same complete-repair generator,
+protocol, and simulation proof.  OT payload sums the modeled selected-message lengths; it is not total wire traffic.
+\label{tab:waterfall-parameters}\label{tab:waterfall-mpc-cost}}
+\end{table}
+
+The compact $4N$ profile is the default. Compared with the $3N$ profile, it
+uses fewer physical columns and OTs, and carries substantially less OT payload.
+The $3N$ profile
+is preferable only when a state is expanded often enough that removing one
+full-domain traversal from every local expansion dominates its larger setup
+and 320-column position map.
+
+\paragraph{Alternative profiles.}
+The same generator admits other setup--state tradeoffs.  Stopping after the
+initial waterfall stage ($r=0$) gives the simplest but least compact profile.
+The asymmetric $4N$ profile $\mathbf d=(32,32,16,8)$, $c=0$, $r=2$ uses
+$m=88$ columns and slightly fewer OTs, but more payload and a smaller
+correctness margin.  A shallow one-repair circuit replaces complete search by
+one fixed depth-two repair and a two-entry stash; it minimizes setup at the
+cost of $6N$ local expansion.  \appendixref{app:waterfallOneRepair} records
+these alternatives without changing the main construction.

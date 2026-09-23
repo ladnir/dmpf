@@ -1,0 +1,17 @@
+distribution,n,w,d,total_bins,trials,failures,seed
+ordinary-distinct,128,3,0,144,262144,22977,16144
+ordinary-distinct,128,3,0,150,262144,1736,16150
+ordinary-distinct,128,3,0,156,262144,71,16156
+ordinary-distinct,128,3,0,162,262144,4,16162
+ordinary-distinct,128,3,0,166,262144,1,16166
+partitioned,128,3,48,144,262144,24077,148
+partitioned,128,3,52,156,262144,98,152
+partitioned,128,3,55,165,1048576,2,13001
+ordinary-distinct,256,3,0,288,65536,3086,17288
+ordinary-distinct,256,3,0,300,65536,40,17300
+ordinary-distinct,256,3,0,312,65536,0,17312
+ordinary-distinct,256,3,0,324,65536,0,17324
+partitioned,256,3,96,288,65536,3192,15004
+partitioned,256,3,100,300,65536,37,15005
+partitioned,256,3,104,312,65536,0,15006
+partitioned,256,3,108,324,65536,0,15007
