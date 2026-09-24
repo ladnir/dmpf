@@ -5,17 +5,15 @@ in the handoff and audit notes; their technical evidence remains relevant.
 
 ## Current snapshots
 
-- Paper: presentation cleanup on `codex/release-readiness`, based on
-  `43d77ce` and recorded by the commit containing this checkpoint. The current
-  PDF is 71 pages.
-- libOTe: `7f2b4e5` on `codex/dmpf-package`, pushed to `osu-crypto/libOTe`.
+- Paper: presentation cleanup `57b3be1` on `codex/release-readiness`;
+  subsequent checkpoint edits change only this checklist. The PDF is 71 pages.
+- libOTe: `334ece9` on `codex/dmpf-package`, pushed to `osu-crypto/libOTe`.
   The implementation worktree is clean at this checkpoint.
-- [Current cross-platform CI](https://github.com/osu-crypto/libOTe/actions/runs/35948449581)
-  targets `7f2b4e57e68cfa8af0817d316d13b13bf2cef2a8` and is running.
-  Dispatch is not a passing result. The preceding run on `597a9cc` built
-  successfully and passed `AnyField_F2Ole_Test`, but Ubuntu then crashed in
-  `DotExt_Kos_Test`; consumer/install checks were skipped. Its fallback job
-  passed, and macOS was still running at this check.
+- [Current cross-platform CI](https://github.com/osu-crypto/libOTe/actions/runs/35950961030)
+  targets `334ece9a828055e96490fe422b47cfb3ac91111c` and is running.
+  Dispatch is not a passing result. The preceding run on `7f2b4e5` failed in
+  Ubuntu's KOS-Dot test and skipped consumer/install checks. Its macOS and
+  fallback jobs passed; Windows was still running at this check.
 
 ## Completed fixes and decisions
 
@@ -52,6 +50,10 @@ in the handoff and audit notes; their technical evidence remains relevant.
   instrumentation for GCC 13–16 ASan builds (`597a9cc`), including downstream
   C++ template consumers. Heap/global checks remain enabled; Clang retains
   full ASan. Full cross-platform validation remains pending below.
+- [x] **KOS-Dot scratch alignment:** `334ece9` uses 32-byte-aligned arrays in
+  the non-inlined, non-coroutine transpose helper. The registered check test
+  now covers scalar transpose agreement, empty/partial/full chunks, and
+  oversized-input rejection. No allocation or protocol arithmetic changed.
 - [x] **Package hygiene:** source, analysis, and regression files are tracked;
   build products are excluded; Python dependencies are pinned. Upgrade notes
   document peer, OT-schedule, cached-state, and serialized-key boundaries.
@@ -69,6 +71,11 @@ in the handoff and audit notes; their technical evidence remains relevant.
   pass with the workaround. Intentional heap overflow remains detected.
   Compiler/version gating and actual libOTe compile/export options were
   checked. This is not a completed full GCC-ASan suite.
+- All five focused KOS-Dot tests pass in each of three builds: plain GCC 13,
+  GCC 13 ASan with stack checks disabled, and Clang 18 ASan. The test and
+  sender/receiver translation units use those configurations. This runner
+  links existing non-ASan dependency archives, not a fully instrumented
+  dependency build. Full validation remains assigned to CI.
 - Exact-permutation/per-list-seed changes passed the 24-suite focused WSL/GCC
   runner at defaults and domain 4097. Four Ring-LPN suites passed with two
   trials; seven exact Python hash-conditioning checks passed.
@@ -81,22 +88,31 @@ in the handoff and audit notes; their technical evidence remains relevant.
    and installed-consumer checks, macOS, Windows, and the fallback job. Fix
    code failures; report infrastructure failures separately. The old failing
    run did not reach Ubuntu's consumer/install checks.
-   **New blocker:** reproduce and diagnose the GCC-ASan `DotExt_Kos_Test`
-   crash in `avx_transpose128`, called by `kosDotTransposeCheckChunk`.
-   The stack trace identifies the failing path, not the root cause. SIMD
-   scratch alignment and helper inlining need inspection before choosing a fix.
 2. [ ] **Refresh implementation validation notes:** after CI completes, record
    its result and tested commit in libOTe's `DMPF_RELEASE_NOTES.md`. Do not mark
    it passed from local probes alone.
-3. [x] **Commit paper presentation cleanup separately:** included in the commit
-   containing this checkpoint. Unrelated local/generated files are excluded;
+3. [x] **Commit paper presentation cleanup separately:** saved in `57b3be1`.
+   Unrelated local/generated files are excluded;
    historical-performance qualifications are retained.
 4. [ ] **Freeze package references:** record final paper/code commits and
    present remaining failures or decisions to Peter. No release tag, upload,
    or merge into a shared libOTe branch is authorized by this checklist.
 
-The KOS-Dot CI crash is unresolved. The test-file-only update does not address
-it; the current run is not evidence of a fix until its results are reviewed.
+The KOS-Dot defect was introduced in `d68d3c7` (2026-08-23): its arrays
+guaranteed only 16-byte alignment, whereas AVX transpose requires 32.
+A focused probe reproduced it without coroutines. Full ASan happened to
+align the arrays; disabling stack instrumentation exposed the existing bug.
+The production repair is applied and locally tested, with full CI pending.
+
+The earlier `AnyField_F2Ole_Test` crash has a different cause: GCC's ASan stack
+epilogue prevents bounded-stack coroutine transfer. A standard-C++ reproducer
+with no libOTe/macoro/coproto dependencies again overflowed under GCC 13.3 and
+15.2 ASan, but passed 100,000 awaits without ASan and under Clang 18 ASan.
+Disassembly shows indirect calls followed by sanitizer cleanup; disabling
+ASan stack instrumentation restores tail jumps. The mitigated CI run passed
+`AnyField_F2Ole_Test` before encountering the separate KOS-Dot alignment bug.
+Diagnostic probes and logs are retained under libOTe's ignored `out/` directory,
+including `crash-root-cause/` and `std_task_*`.
 
 ## Accepted limitations and deferred work
 
