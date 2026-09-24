@@ -8,13 +8,14 @@ in the handoff and audit notes; their technical evidence remains relevant.
 - Paper: presentation cleanup on `codex/release-readiness`, based on
   `43d77ce` and recorded by the commit containing this checkpoint. The current
   PDF is 71 pages.
-- libOTe: `597a9cc` on `codex/dmpf-package`, pushed to `osu-crypto/libOTe`.
+- libOTe: `7f2b4e5` on `codex/dmpf-package`, pushed to `osu-crypto/libOTe`.
   The implementation worktree is clean at this checkpoint.
-- [Current cross-platform CI](https://github.com/osu-crypto/libOTe/actions/runs/35946866756)
-  targets `597a9cc2f216d9c527d908b188b29aeba787a211`. At this check, the
-  Curve25519 sodium-fallback job passed and Ubuntu was building. Unit tests,
-  consumer/install checks, macOS, and Windows are not yet validated by this run.
-  Dispatch is not a passing result.
+- [Current cross-platform CI](https://github.com/osu-crypto/libOTe/actions/runs/35948449581)
+  targets `7f2b4e57e68cfa8af0817d316d13b13bf2cef2a8` and is running.
+  Dispatch is not a passing result. The preceding run on `597a9cc` built
+  successfully and passed `AnyField_F2Ole_Test`, but Ubuntu then crashed in
+  `DotExt_Kos_Test`; consumer/install checks were skipped. Its fallback job
+  passed, and macOS was still running at this check.
 
 ## Completed fixes and decisions
 
@@ -42,6 +43,11 @@ in the handoff and audit notes; their technical evidence remains relevant.
 - [x] **PPRF output-size mismatch:** expose only the unpadded PPRF prefix during
   expansion, then restore the encoder buffer size (`597a9cc`). Silent OT/VOLE
   tests now cover the 1,024-output regression.
+- [x] **Circuit-test file artifacts:** cryptoTools `d870e28`, pinned by libOTe
+  `7f2b4e5`, replaces binary/JSON test files with memory streams. Three binary
+  round trips passed from an empty, read-only directory without creating files.
+  JSON support was disabled locally. The old generated `.bin` was verified
+  against the test circuit and removed from the paper working directory.
 - [x] **GCC ASan coroutine stack overflow mitigation:** disable only ASan stack
   instrumentation for GCC 13–16 ASan builds (`597a9cc`), including downstream
   C++ template consumers. Heap/global checks remain enabled; Clang retains
@@ -75,6 +81,10 @@ in the handoff and audit notes; their technical evidence remains relevant.
    and installed-consumer checks, macOS, Windows, and the fallback job. Fix
    code failures; report infrastructure failures separately. The old failing
    run did not reach Ubuntu's consumer/install checks.
+   **New blocker:** reproduce and diagnose the GCC-ASan `DotExt_Kos_Test`
+   crash in `avx_transpose128`, called by `kosDotTransposeCheckChunk`.
+   The stack trace identifies the failing path, not the root cause. SIMD
+   scratch alignment and helper inlining need inspection before choosing a fix.
 2. [ ] **Refresh implementation validation notes:** after CI completes, record
    its result and tested commit in libOTe's `DMPF_RELEASE_NOTES.md`. Do not mark
    it passed from local probes alone.
@@ -85,8 +95,8 @@ in the handoff and audit notes; their technical evidence remains relevant.
    present remaining failures or decisions to Peter. No release tag, upload,
    or merge into a shared libOTe branch is authorized by this checklist.
 
-No additional confirmed, unaddressed implementation defect was identified in
-the reconciled package checklist. This is not a claim of an exhaustive audit.
+The KOS-Dot CI crash is unresolved. The test-file-only update does not address
+it; the current run is not evidence of a fix until its results are reviewed.
 
 ## Accepted limitations and deferred work
 
