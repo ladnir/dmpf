@@ -21,8 +21,8 @@ A separate analysis bounds the concrete hash evaluator's batch correctness
 error below $2^{-40}$ at the filtered degree-$2^{20}$ parameter point.
 
 Our measurements use an earlier implementation of this specialized
-Reverse-Cuckoo pipeline. They predate the fresh-mask update, support-rejection
-filter, and AES rekeying described here.
+Reverse-Cuckoo pipeline. They predate the mask, support-filter, permutation,
+and evaluator-seed updates, and the AES rekeying described here.
 At degree $2^{20}$ it produces 1.81 million Goldilocks-field OLEs per second,
 with 12.99 MB communicated per expansion.
 Against the reported FHE baseline at the same field and degree, these figures

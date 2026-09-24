@@ -47,8 +47,9 @@ correctness for the filtered $N_{\mathsf R}=2^{20}$ caller distribution.
 
 \paragraph{Measured performance.}
 The end-to-end measurements use Reverse Cuckoo over two prime fields.
-They predate the fresh-mask update, support-rejection filter, and AES
-rekeying described here; they do not validate the complete current recipe.
+They predate the mask, support-filter, permutation, and evaluator-seed
+updates, and the AES rekeying described here; they do not validate the
+complete current recipe.
 At $n=2^{20}$, the Goldilocks field
 $q=2^{64}-2^{32}+1$ gives 1.81 million OLEs/s and 12.99 MB per expansion.
 The Fp31 field gives 2.71 million OLEs/s and 6.51 MB.

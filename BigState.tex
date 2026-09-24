@@ -1,13 +1,19 @@
 
-\section{Improved Bigstate DMPF.}\label{sec:bigState}
+\section{Improved Big-State DMPF}\label{sec:bigState}
 
-Boyle et al.\cite{dmpf} introduced two new approaches to DMPF: an OKVS-based construction and the \emph{big-state} construction. 
+Boyle et al.~\cite{dmpf} introduced two approaches to DMPF: an OKVS-based construction and the \emph{big-state} construction.
 The OKVS variant uses \emph{oblivious key-value stores} to encode correction information for multiple indices, achieving good performance for very large $t$. 
-By contrast, the big-state construction is tailored for small to moderate weights $t$ (roughly $3 \leq t \leq 70$), which are precisely the regimes arising in pseudorandom correlation generators. This work has the major caveat that they focus on the trusted dealer setting where a central party construct the DPF keys and distirbuted them to the two evaluation parties. As such, they do not realize the API $\textsf{DMPF}(\share{A},\share{B})$ but instead requires the dealer to know $A,B$ in plaintext. Never the less, \cite{dmpf} does give a fully distributed protocol for their big state construction which we review next.
+By contrast, the big-state construction targets small to moderate weights
+$t$ (roughly $3 \leq t \leq 70$), as arise in pseudorandom correlation
+generators. The work primarily considers a trusted dealer that knows
+$A,B$ in plaintext, constructs the keys, and distributes them to the
+evaluation parties. That interface differs from distributed generation
+with secret-shared inputs. The authors also give a fully distributed
+protocol for their big-state construction, which we review next.
 
 The key insight of the big-state construction is to generalize the standard single point DPF protocol of \sectionref{sec:dpf} such that the ``tag bit'' vector that marks the active child on each level becomes a set of $t$ \emph{tag vectors}. Instead of each node $i$ carrying a single bit $\tau_i$ that determines which child is ``active,'' each node $i$ in the evaluation tree maintains  $t$ tag bits $\tau_{1,i},...,\tau_{t,i}$. As before, each tag vector is a unit vector, i.e. $|\tau_j|=1$. However, there are now $t$ check vectors and therefore there can be $t$ active children on each level.
 
-\begin{figure}[H]\small
+\begin{figure}[!htbp]\small
 	\centering
 	\fbox{ \begin{minipage}{.95\textwidth}
     For public parameters $\kappa,n,w\in \mathbb{N}$, group $\mathbb{G}$, PRG $\mathsf{G}:\{0,1\}^\kappa \rightarrow\{0,1\}^{2t+2\kappa}$ , $D:=\lceil \log_w(n)\rceil$.\\
@@ -57,7 +63,8 @@ The key insight of the big-state construction is to generalize the standard sing
     \end{enumerate}
     \end{minipage}}
 \caption{%
-  Big-state Distributed Multi-Point Function (DPF) protocol \cite{dmpf}. Does not include our optimized \SharedIPD protocol.  \label{fig:BS-Dmpf}
+  Big-state distributed multi-point function (DMPF) protocol \cite{dmpf},
+  before substituting our optimized \SharedIPD protocol. \label{fig:BS-Dmpf}
 }
 \end{figure}
 
@@ -73,7 +80,16 @@ Observe that the parent level has $t$ unit vectors $\share{\tau^{d-1}_1},...,\sh
 \end{align*}
 The left sum would be $a+c$ while the right sum is $b+d$ but instead we want two pairs $(a,b)$ and $(c,d)$. Once we have these pairs we can compute the desired correction values using a constant sized MPC protocol. 
 
-To obtain these pairs, we want to compute the inner product of the unit vectors $\share{\tau^{d-1}_i}\in \{0,1\}^{2^{d-1}}$ with the weight (at most) $t$ vector $\share{s'}$, where we view each pair of siblings in $s'$ as a single element. \cite{dmpf} gave a protocol for doing this called  $\SharedIPD$. Unfortunently, this routines is inefficient and only better than a trivial linear time solution when $n \gg 2^{30}$. Their approach is reproduced in \SharedIPD of \figureref{fig:BS-Dmpf}. The idea is to perform the inner product not on the seed+tag vector with $\{0,1\}^{2\kappa+2t}$ elements but one bit at a time. That is, compute the inner product between a unit vector $\share{\tau^{d-1}_i}\in \{0,1\}^{2^{d-1}}$ and a vector $\share{v}$ with weight at most $t$. Given this, one can compute the general case by using $2\kappa+2t$ calls to  $\SharedIPD$, one for each bit of the seed and tag vectors.
+To obtain these pairs, we compute the inner product of each unit vector
+$\share{\tau^{d-1}_i}\in \{0,1\}^{2^{d-1}}$ with the weight-at-most-$t$
+vector $\share{s'}$, treating each sibling pair as one element.
+Boyle et al.~\cite{dmpf} give a protocol called $\SharedIPD$ for this task.
+This routine improves on the trivial linear-time solution only when
+$n \gg 2^{30}$. \figureref{fig:BS-Dmpf} reproduces their approach.
+It computes the inner product one bit at a time, rather than operating
+directly on seed-and-tag elements in $\{0,1\}^{2\kappa+2t}$.
+The general case therefore uses $2\kappa+2t$ calls to $\SharedIPD$, one
+for each bit of the seed and tag vectors.
 
 The idea is to reduce the general inner product problem between unit vector $u:=\tau^{d-1}_i\in \{0,1\}^m$ and weight at most $t$ vector $v\in \{0,1\}^m$ into many tiny checks using randomized 
 set partitions. Concretely, $\SharedIPD$ repeatedly partitions the index set $[m]$ into disjoint 
@@ -106,7 +122,12 @@ practically competitive in the fully distributed setting.
 
 \subsection{Improved \SharedIPD}
 
-We improve the basic idea of \cite{dmpf} by giving a more efficient protocol that also directly work when the weight $t$ vector has strings for elements, as opposed to bits. That is, $u\in\{0,1\}^m$ is a \emph{unit} vector; $v\in \{0,1\}^{\sigma \times m}$ has Hamming weight $\le t$ when viewed as vector of $\{0,1\}^\sigma$ elements. Given secret shares $\share{u},\share{v}$, we want $\share{\langle u,v\rangle}$ with only:
+We improve the basic idea of \cite{dmpf} with a protocol that operates
+directly on strings rather than one bit at a time.
+Here $u\in\{0,1\}^m$ is a \emph{unit} vector, and
+$v\in \{0,1\}^{\sigma \times m}$ has at most $t$ nonzero
+$\sigma$-bit entries. Given secret shares $\share{u},\share{v}$,
+we compute $\share{\langle u,v\rangle}$ using only:
 (i) applying public linear maps to $\share{u}$ and $\share{v}$; and (ii) $O(\mathrm{poly}(t))$ nonlinear ops.
 
 

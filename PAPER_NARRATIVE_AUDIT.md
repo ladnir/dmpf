@@ -1,5 +1,28 @@
 # Paper narrative and correctness audit
 
+## Upload presentation pass (2026-09-23)
+
+Peter approved retaining the historical performance numbers. The abstract,
+introduction, and evaluation now also identify the later exact-permutation
+and per-list evaluator-seed changes. Performance tables and plotted data are
+unchanged; no protocol, assumption, or theorem was revised.
+
+Checked the 20 TeX inputs used by the full build and the extracted PDF text:
+no TODOs, placeholders, or author comments occur in the included paper.
+Historical draft markers remain in `notes.tex`, which is not included.
+Disabled author-comment rendering for the upload build, corrected big-state
+prose and its DMPF caption, and removed redundant package/font commands.
+Explicit plot bounds remove the empty-axis warnings; the small Dedup+ label
+is placed above its bar. Allowing the large big-state figure to float nearby
+removes a largely blank page. The protected insertion paragraph is unchanged.
+
+The final 71-page PDF has stable references and no LaTeX warnings, undefined
+references, overfull boxes, or duplicate destinations. Rendered pages were
+reviewed for layout, with close inspection of the revised front matter,
+big-state figure, and performance charts. This is presentation validation,
+not a new security audit or benchmark. Next: commit and freeze the upload
+snapshot, keeping historical working notes out of any submission bundle.
+
 ## Classical-cuckoo cleanup (2026-09-07)
 
 Completed the worked-example follow-up below. `Cuckoo.tex` now defines the

@@ -8,13 +8,13 @@ We measure an implementation of the \emph{Reverse Cuckoo} DMPF
 \sectionref{sec:pcgPerm} measures the end-to-end Ring-LPN OLE pipeline
 and compares it with OLE and Beaver-triple baselines.
 
-All timings predate the AES rekeying in \appendixref{app:dpf-aes}.
+All timings predate the AES rekeying in \appendixref{app:dpf-aes},
+the switch to exact-uniform permutations, and the use of independent
+evaluator seeds for each product list.
 The OLE measurements also predate the per-expansion mask refresh in
 \sectionref{sec:stationary} and omit the support-rejection filter used by
-the current parameter recipe. The current implementation refreshes the
-masks and filters supports at the analyzed Goldilocks point, but the tables
-have not been remeasured. These results describe the
-earlier revision, not validation of the complete current recipe.
+the current parameter recipe. These results characterize the measured
+revision, not the complete current recipe.
 
 \paragraph{Environment.}
 Benchmarks used an i7-13700H CPU with 32\,GB DDR5 memory and local sockets
@@ -65,10 +65,11 @@ $2^{20}$ & 128 & 988.50 & 38.50 & 1104 & 3 \\
   height=2.8cm,
   xbar stacked,
   xmin=0, xmax=100,
+  ymin=0.5, ymax=1.5,
   bar width=10mm,
   ytick={1},
   yticklabels={\ },
-  enlarge y limits=0.35,
+  enlarge y limits=false,
   xlabel={Share of setup time (\%)},
   xtick distance=10,
   xticklabel=\pgfmathprintnumber{\tick}\,\%,
@@ -76,7 +77,7 @@ $2^{20}$ & 128 & 988.50 & 38.50 & 1104 & 3 \\
 ]
 
 % Centered labels for each segment
-\node[font=\scriptsize] at (axis cs:  4.785,1) {Dedup+ };
+\node[overlay,font=\scriptsize,anchor=south west,yshift=16pt] at (axis cs: 0,1) {Dedup+};
 \node[font=\scriptsize] at (axis cs: 19.405,1) {Solve};
 \node[font=\scriptsize] at (axis cs: 49.460,1) {Sparse Sets};
 \node[font=\scriptsize] at (axis cs: 80.535,1) {Sparse DPF };
@@ -160,10 +161,11 @@ $n=2^{20}$ caller distribution, not the measured unfiltered sampler.
   height=2.8cm,
   xbar stacked,
   xmin=0, xmax=108, % >100 to include one expansion cost
+  ymin=0.5, ymax=1.5,
   bar width=10mm,
   ytick={1},
   yticklabels={\ },
-  enlarge y limits=0.35,
+  enlarge y limits=false,
   xlabel={Share of setup time (\%)},
   xtick distance=10,
   xticklabel=\pgfmathprintnumber{\tick}\,\%,

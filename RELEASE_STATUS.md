@@ -1,61 +1,109 @@
 # Release checkpoint — 2026-09-23
 
-## Saved snapshots
+This is the current package checklist. It supersedes earlier release task lists
+in the handoff and audit notes; their technical evidence remains relevant.
 
-- Paper and analysis snapshot: `ea0ccff` in this repository.
-- libOTe implementation: `8bcd440` on `codex/dmpf-package` in
-  `osu-crypto/libOTe`. This includes the sparse-DPF correction fixes, activity
-  masking, and both AES rekeying schedules.
-- libOTe compatibility/release notes: `e46c72d`; only documentation and cache
-  exclusions changed after the implementation snapshot.
+## Current snapshots
 
-The implementation snapshot is running through the existing Linux/ASan,
-macOS, and Windows CI workflow:
-https://github.com/osu-crypto/libOTe/actions/runs/35874069035
-Do not infer success from dispatch; check the completed jobs.
+- Paper: presentation cleanup on `codex/release-readiness`, based on
+  `43d77ce` and recorded by the commit containing this checkpoint. The current
+  PDF is 71 pages.
+- libOTe: `597a9cc` on `codex/dmpf-package`, pushed to `osu-crypto/libOTe`.
+  The implementation worktree is clean at this checkpoint.
+- [Current cross-platform CI](https://github.com/osu-crypto/libOTe/actions/runs/35946866756)
+  targets `597a9cc2f216d9c527d908b188b29aeba787a211`. At this check, the
+  Curve25519 sodium-fallback job passed and Ubuntu was building. Unit tests,
+  consumer/install checks, macOS, and Windows are not yet validated by this run.
+  Dispatch is not a passing result.
 
-## Completed release cleanup
+## Completed fixes and decisions
 
-- Committed the previously untracked paper sections, analysis programs,
-  recorded experiment results, implementation files, and regression tests.
-- Excluded local build products, virtual environments, and Python caches.
-- Added pinned Python test dependencies and paper/test CI.
-- Added DMPF peer, OT-schedule, cached-state, and serialized-key compatibility
-  notes in libOTe. These notes distinguish the generic Waterfall construction
-  from the application-specific Reverse-Cuckoo use case.
+- [x] **Sparse-DPF activity and correction leakage:** activity masking and
+  selected-correction low-bit repair are implemented (`8bcd440`), with
+  regression coverage for inactive levels, encoding, and both DMPF backends.
+- [x] **AES rekeying:** internal-node and cached-leaf schedules rekey after
+  1,024 parent positions or leaf positions, respectively (`8bcd440`). This is
+  hardening, not a proof of the concrete evaluator.
+- [x] **Fresh Ring-LPN public masks:** resampled for every expansion (`b2e9b7b`).
+- [x] **Ring-LPN support filter:** implemented for Goldilocks, ring degree
+  2^20, four polynomials, and weight 16 (`c2fa1bc`). Each party resamples its
+  whole support tuple until it occupies at least 61 residues modulo 128,
+  counted separately by polynomial. Both DMPF backends and OLE/triple modes
+  use the filter; accepted supports persist across reuse.
+- [x] **OLE composition note:** the conditional simulator argument is recorded
+  in `OLE_COMPOSITION_NOTE.md`, outside the PDF as requested. It closes in the
+  stated ideal-subprotocol model, not unconditionally for concrete AES.
+- [x] **Exact Reverse-Cuckoo permutations:** serial privately controlled
+  Waksman passes use independently sampled uniform permutations (`68c1a6b`).
+- [x] **Independent Reverse-Cuckoo evaluator seeds:** fresh contributions for
+  every `(set, partition)` replace batch-shared evaluators (`68c1a6b`).
+- [x] **Zero coefficients:** retain uniform field sampling, including zero.
+  This approved choice is reflected in the paper; no rejection fix is pending.
+- [x] **PPRF output-size mismatch:** expose only the unpadded PPRF prefix during
+  expansion, then restore the encoder buffer size (`597a9cc`). Silent OT/VOLE
+  tests now cover the 1,024-output regression.
+- [x] **GCC ASan coroutine stack overflow mitigation:** disable only ASan stack
+  instrumentation for GCC 13–16 ASan builds (`597a9cc`), including downstream
+  C++ template consumers. Heap/global checks remain enabled; Clang retains
+  full ASan. Full cross-platform validation remains pending below.
+- [x] **Package hygiene:** source, analysis, and regression files are tracked;
+  build products are excluded; Python dependencies are pinned. Upgrade notes
+  document peer, OT-schedule, cached-state, and serialized-key boundaries.
+- [x] **Paper presentation pass:** no draft markers in included TeX, stable
+  references, no compilation warnings or overfull boxes, and rendered-page
+  inspection completed. Numerical tables and plots are unchanged. These edits
+  are included in the separate paper checkpoint commit.
 
-Local validation: 216 paper-analysis tests pass with Python 3.12 and the pinned
-dependencies. Seven libOTe hash-conditioning tests pass. The focused 23-test
-WSL/GCC runner passed with defaults and with `-domain 4097` during the release
-audit. The existing 72-page PDF has stable references and no overfull boxes;
-the current cleanup does not change its TeX content. Remote CI is the remaining
-cross-platform check. No new performance benchmarks were run.
+## Validation already obtained
 
-## Remaining decisions and work
+- Full Clang 18 ASan suite with the buffer fix: **333 passed, 3 skipped**, with
+  no sanitizer or leak report. This precedes the GCC-only workaround, which
+  does not change Clang compilation.
+- GCC 13.3 and 15.2 standalone coroutine probes and exported-target consumers
+  pass with the workaround. Intentional heap overflow remains detected.
+  Compiler/version gating and actual libOTe compile/export options were
+  checked. This is not a completed full GCC-ASan suite.
+- Exact-permutation/per-list-seed changes passed the 24-suite focused WSL/GCC
+  runner at defaults and domain 4097. Four Ring-LPN suites passed with two
+  trials; seven exact Python hash-conditioning checks passed.
+- Earlier paper-analysis validation passed 216 tests with pinned dependencies.
+  No new end-to-end benchmarks were run for this release pass.
 
-1. **Ring-LPN support rejection implemented for the analyzed profile.**
-   Setup now filters Goldilocks supports at ring degree 2^20, four polynomials,
-   and weight 16. It requires at least 61 occupied residues modulo 128,
-   counted separately by polynomial, and resamples the whole tuple on
-   rejection. Other profiles retain their unfiltered, unvalidated sampler.
-   No threshold or security estimate is extrapolated to them.
-2. **Complete the OLE composition argument.** The DMPF functionality permits
-   the corrupt output share to be selected. Show the target application
-   correlation distribution and simulation, rather than inferring them
-   from DMPF correctness/privacy alone. Do not strengthen the functionality
-   or change the protocol without discussion.
-3. **Retain or revise the concrete AES assumption.** The inherited evaluator
-   and rekeying schedules are explicitly conjectured instantiations, not
-   consequences already proved by the abstract DPF theorem. Current release
-   notes preserve that scope; this cleanup does not add a proof requirement
-   beyond the paper's stated research claims.
-4. **Refresh end-to-end measurements after the sampler is settled.** Existing
-   tables describe an earlier revision. Record both constructions, setup,
-   repeated expansion, and communication at a fixed commit. Run benchmarks
-   sequentially, never concurrently.
-5. **Review completed CI and freeze the release.** Fix any code failures,
-   distinguish infrastructure failures, and pin the final paper/code commits.
-   No release tag or merge into a shared libOTe branch has been made.
+## Remaining release work
 
-Recommended next substantive task: the OLE composition argument. Await
-Peter's direction on the remaining gaps.
+1. [ ] **Review current CI:** require Ubuntu/GCC-ASan unit tests, source-tree
+   and installed-consumer checks, macOS, Windows, and the fallback job. Fix
+   code failures; report infrastructure failures separately. The old failing
+   run did not reach Ubuntu's consumer/install checks.
+2. [ ] **Refresh implementation validation notes:** after CI completes, record
+   its result and tested commit in libOTe's `DMPF_RELEASE_NOTES.md`. Do not mark
+   it passed from local probes alone.
+3. [x] **Commit paper presentation cleanup separately:** included in the commit
+   containing this checkpoint. Unrelated local/generated files are excluded;
+   historical-performance qualifications are retained.
+4. [ ] **Freeze package references:** record final paper/code commits and
+   present remaining failures or decisions to Peter. No release tag, upload,
+   or merge into a shared libOTe branch is authorized by this checklist.
+
+No additional confirmed, unaddressed implementation defect was identified in
+the reconciled package checklist. This is not a claim of an exhaustive audit.
+
+## Accepted limitations and deferred work
+
+- **Other Ring-LPN profiles remain unvalidated.** Do not extrapolate the
+  support threshold or security estimates beyond the analyzed profile.
+- **Concrete AES security remains conjectural.** The inherited evaluator and
+  rekeying schedules are not proved consequences of the abstract DPF theorem.
+  Peter accepted documenting this boundary rather than requiring a new proof
+  for this research release.
+- **Reverse Cuckoo remains application-specific and leaky.** Waterfall is the
+  generic construction; the specialized path requires the stated assumption.
+- **Performance tables remain historical.** Peter accepted existing numbers
+  with explicit qualifications. Refreshing setup, repeated-expansion, and
+  communication measurements is deferred, not a current release blocker.
+  Future benchmarks must run sequentially, never concurrently.
+- **GCC workaround follow-up:** retest GCC 17 before extending the range.
+  Clang full-ASan coverage remains important while GCC stack checks are disabled.
+
+Recommended next task: review current CI, especially the previously skipped
+consumer/install checks, then finalize validation notes and the paper commit.
